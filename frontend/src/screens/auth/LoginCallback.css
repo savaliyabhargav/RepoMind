@@ -1,0 +1,246 @@
+/* ══════════════════════════════════════════════
+   LoginCallback.css — RepoMind OAuth waiting room
+   Matches the dark terminal aesthetic of LandingScreen
+   ══════════════════════════════════════════════ */
+
+@import url("https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap");
+
+/* ── Reset ────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* ── Tokens (same as LandingScreen) ──────────── */
+:root {
+  --bg:           #0a0c10;
+  --surface:      #161b22;
+  --surface-2:    #1c2230;
+  --border:       rgba(255, 255, 255, 0.07);
+  --border-accent: rgba(88, 166, 255, 0.3);
+
+  --text-primary:   #e6edf3;
+  --text-secondary: #7d8590;
+  --text-muted:     #484f58;
+
+  --accent:       #58a6ff;
+  --green:        #3fb950;
+  --red:          #f85149;
+
+  --font-display: "Syne", sans-serif;
+  --font-mono:    "JetBrains Mono", monospace;
+
+  --radius-md:    10px;
+  --radius-lg:    16px;
+  --transition:   200ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ── Root ─────────────────────────────────────── */
+.callback-root {
+  position: relative;
+  min-height: 100vh;
+  background: var(--bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+/* ── Grid background (same as landing) ───────── */
+.callback-grid {
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(88, 166, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(88, 166, 255, 0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none;
+}
+
+.callback-grid::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    ellipse 70% 60% at 50% 50%,
+    var(--bg) 0%,
+    transparent 100%
+  );
+}
+
+/* ── Card ─────────────────────────────────────── */
+.callback-card {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 400px;
+  margin: 1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 2.5rem 2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2rem;
+  animation: cardIn 0.4s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+@keyframes cardIn {
+  from { opacity: 0; transform: translateY(16px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* ── Logo ─────────────────────────────────────── */
+.callback-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.cb-bracket { color: var(--accent); font-weight: 600; }
+.cb-text    { color: var(--text-primary); }
+
+/* ── State wrapper ────────────────────────────── */
+.cb-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 10px;
+  width: 100%;
+}
+
+/* ── Icon wrapper ─────────────────────────────── */
+.cb-icon-wrap {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent);
+  margin-bottom: 0.5rem;
+  transition: border-color var(--transition);
+}
+
+.cb-icon-wrap.cb-success {
+  background: rgba(63, 185, 80, 0.1);
+  border-color: rgba(63, 185, 80, 0.3);
+  color: var(--green);
+}
+
+.cb-icon-wrap.cb-error {
+  background: rgba(248, 81, 73, 0.1);
+  border-color: rgba(248, 81, 73, 0.3);
+  color: var(--red);
+}
+
+/* ── Spinner ──────────────────────────────────── */
+.cb-spinner {
+  width: 26px;
+  height: 26px;
+  animation: spin 1s linear infinite;
+  color: var(--accent);
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+/* ── Check / X icons ──────────────────────────── */
+.cb-check,
+.cb-x {
+  width: 24px;
+  height: 24px;
+}
+
+.cb-check {
+  animation: checkPop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@keyframes checkPop {
+  from { opacity: 0; transform: scale(0.5); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+/* ── Text ─────────────────────────────────────── */
+.cb-title {
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.02em;
+}
+
+.cb-subtitle {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  max-width: 280px;
+}
+
+/* ── Progress steps ───────────────────────────── */
+.cb-steps {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 0.75rem;
+  width: 100%;
+  max-width: 220px;
+}
+
+.cb-step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.step-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  flex-shrink: 0;
+  animation: pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.3; transform: scale(0.8); }
+  50%       { opacity: 1;   transform: scale(1.2); }
+}
+
+/* ── Retry button ─────────────────────────────── */
+.cb-retry-btn {
+  margin-top: 0.75rem;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--accent);
+  background: transparent;
+  border: 1px solid var(--border-accent);
+  border-radius: var(--radius-md);
+  padding: 8px 20px;
+  cursor: pointer;
+  transition: background var(--transition), color var(--transition);
+}
+
+.cb-retry-btn:hover {
+  background: rgba(88, 166, 255, 0.08);
+}
+
+.cb-retry-btn:active {
+  transform: scale(0.98);
+}
