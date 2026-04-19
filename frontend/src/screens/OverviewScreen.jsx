@@ -1,136 +1,286 @@
-import { useCallback } from "react";
+import { useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "../store/authStore";
 import authService from "../services/authService";
+import repoService from "../services/repoService";
 import "./OverviewScreen.css";
 
-// ─── Component ───────────────────────────────────────────────────────────────
+// ── Ingest status states ───────────────────────────────────────────────────
+const INGEST = {
+  IDLE:    "idle",
+  LOADING: "loading",
+  SUCCESS: "success",
+  ERROR:   "error",
+};
+
+// ── Validate GitHub URL ────────────────────────────────────────────────────
+function isValidGithubUrl(url) {
+  try {
+    const u = new URL(url);
+    return u.hostname === "github.com" && u.pathname.split("/").filter(Boolean).length >= 2;
+  } catch {
+    return false;
+  }
+}
+
 export default function OverviewScreen() {
   const navigate = useNavigate();
-  const user = useAuthStore((s) => s.user);
+  const user     = useAuthStore((s) => s.user);
 
-  // Format the joined date nicely
+  const [repoUrl, setRepoUrl]   = useState("");
+  const [ingest, setIngest]     = useState(INGEST.IDLE);
+  const [errorMsg, setErrorMsg] = useState("");
+  const [repoData, setRepoData] = useState(null);
+
   const joinedDate = user?.createdAt
     ? new Date(user.createdAt).toLocaleDateString("en-GB", {
-        day: "numeric",
-        month: "long",
-        year: "numeric",
+        day: "numeric", month: "short", year: "numeric",
       })
     : "—";
 
   const handleLogout = useCallback(async () => {
-    await authService.logoutApi(); // clears store + invalidates cookie
+    await authService.logoutApi();
     navigate("/", { replace: true });
   }, [navigate]);
 
+  const handleIngest = useCallback(async () => {
+    if (!repoUrl.trim()) return;
+
+    if (!isValidGithubUrl(repoUrl.trim())) {
+      setErrorMsg("Enter a valid GitHub URL — e.g. https://github.com/owner/repo");
+      setIngest(INGEST.ERROR);
+      return;
+    }
+
+    setIngest(INGEST.LOADING);
+    setErrorMsg("");
+    setRepoData(null);
+
+    try {
+      const data = await repoService.ingestRepo(repoUrl.trim(), user.id);
+      setRepoData(data);
+      setIngest(INGEST.SUCCESS);
+      setTimeout(() => navigate(`/analyze/repo/${data.id}`), 1200);
+    } catch (err) {
+      console.error("[OverviewScreen] Ingest failed:", err);
+      setErrorMsg(err.response?.data?.message || "Failed to ingest repository. Please try again.");
+      setIngest(INGEST.ERROR);
+    }
+  }, [repoUrl, user, navigate]);
+
   return (
-    <div className="overview-root">
-      <div className="overview-grid" aria-hidden="true" />
+    <div className="ov-root">
+      <div className="ov-scanlines" aria-hidden="true" />
 
-      {/* ── Top nav bar ── */}
-      <header className="overview-nav">
-        <div className="nav-logo">
-          <span className="nb">[</span>
-          <span className="nt">RepoMind</span>
-          <span className="nb">]</span>
+      {/* ── Nav ── */}
+      <header className="ov-nav">
+        <div className="ov-nav-left">
+          <div className="ov-logo">
+            <span className="ov-lb">[</span>
+            <span className="ov-lt">RepoMind</span>
+            <span className="ov-lb">]</span>
+          </div>
+          <div className="ov-nav-tag">MISSION CONTROL</div>
         </div>
-
-        <button className="btn-logout" onClick={handleLogout}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"
-            aria-hidden="true">
-            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-            <polyline points="16 17 21 12 16 7" />
-            <line x1="21" y1="12" x2="9" y2="12" />
-          </svg>
-          Logout
-        </button>
+        <div className="ov-nav-right">
+          <div className="ov-status-pill">
+            <span className="ov-status-dot" />
+            SYSTEMS NOMINAL
+          </div>
+          <button className="ov-logout-btn" onClick={handleLogout}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+              <polyline points="16 17 21 12 16 7" />
+              <line x1="21" y1="12" x2="9" y2="12" />
+            </svg>
+            LOGOUT
+          </button>
+        </div>
       </header>
 
-      {/* ── Main content ── */}
-      <main className="overview-main">
-        {/* Profile card */}
-        <div className="profile-card" role="region" aria-label="Your profile">
-          {/* Avatar */}
-          <div className="profile-avatar-wrap">
-            {user?.avatarUrl ? (
-              <img
-                src={user.avatarUrl}
-                alt={`${user.username}'s GitHub avatar`}
-                className="profile-avatar"
-              />
-            ) : (
-              <div className="profile-avatar-fallback" aria-label="Avatar placeholder">
-                {user?.username?.[0]?.toUpperCase() ?? "?"}
+      {/* ── Three-panel layout ── */}
+      <main className="ov-main">
+
+        {/* LEFT — Operator profile */}
+        <aside className="ov-panel ov-left">
+          <p className="ov-panel-label">OPERATOR</p>
+
+          <div className="ov-profile">
+            <div className="ov-avatar-wrap">
+              {user?.avatarUrl ? (
+                <img src={user.avatarUrl} alt={`${user.username} avatar`} className="ov-avatar" />
+              ) : (
+                <div className="ov-avatar-fallback">
+                  {user?.username?.[0]?.toUpperCase() ?? "?"}
+                </div>
+              )}
+              <div className="ov-avatar-ring" aria-hidden="true" />
+            </div>
+            <p className="ov-profile-name">{user?.username ?? "—"}</p>
+            {user?.email && <p className="ov-profile-email">{user.email}</p>}
+          </div>
+
+          <div className="ov-readouts">
+            {[
+              { label: "CLEARANCE", value: user?.plan ?? "FREE" },
+              { label: "ENROLLED",  value: joinedDate },
+              { label: "PROVIDER",  value: "GITHUB" },
+              { label: "STATUS",    value: "ACTIVE" },
+            ].map(({ label, value }) => (
+              <div key={label} className="ov-readout">
+                <span className="ov-readout-label">{label}</span>
+                <span className="ov-readout-value">{value}</span>
               </div>
-            )}
-            <span className="avatar-badge" title="Authenticated via GitHub">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                <path d="M12 0C5.374 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z" />
-              </svg>
-            </span>
+            ))}
           </div>
 
-          {/* Name + username */}
-          <div className="profile-identity">
-            <h1 className="profile-name">
-              {user?.username ?? "GitHub User"}
+          <div className="ov-uid-block">
+            <span className="ov-uid-label">UID</span>
+            <span className="ov-uid-value">{user?.id ?? "—"}</span>
+          </div>
+        </aside>
+
+        {/* CENTER — Repo ingestion */}
+        <section className="ov-panel ov-center">
+          <p className="ov-panel-label">TARGET ACQUISITION</p>
+
+          <div className="ov-hero">
+            <h1 className="ov-hero-title">
+              SCAN A<br />
+              <span className="ov-hero-accent">REPOSITORY</span>
             </h1>
-            {user?.email && (
-              <p className="profile-email">{user.email}</p>
-            )}
+            <p className="ov-hero-sub">
+              Enter a public GitHub repository URL to begin deep analysis.
+              RepoMind maps the entire file structure and prepares it for AI interrogation.
+            </p>
           </div>
 
-          {/* Plan badge */}
-          <div className={`plan-badge plan-${(user?.plan ?? "FREE").toLowerCase()}`}>
-            <span className="plan-dot" aria-hidden="true" />
-            {user?.plan ?? "FREE"} plan
+          {/* Input */}
+          <div className={`ov-input-wrap ${ingest === INGEST.ERROR ? "is-error" : ""} ${ingest === INGEST.SUCCESS ? "is-success" : ""}`}>
+            <span className="ov-input-prefix">URL://</span>
+            <input
+              className="ov-input"
+              type="url"
+              placeholder="github.com/owner/repository"
+              value={repoUrl}
+              onChange={(e) => {
+                setRepoUrl(e.target.value);
+                if (ingest === INGEST.ERROR) setIngest(INGEST.IDLE);
+              }}
+              onKeyDown={(e) => e.key === "Enter" && handleIngest()}
+              disabled={ingest === INGEST.LOADING || ingest === INGEST.SUCCESS}
+              spellCheck={false}
+              autoComplete="off"
+              aria-label="GitHub repository URL"
+            />
           </div>
-        </div>
 
-        {/* Stats / details grid */}
-        <div className="details-grid">
-          <DetailCard
-            label="GitHub username"
-            value={`@${user?.username ?? "—"}`}
-            mono
-          />
-          <DetailCard
-            label="Email address"
-            value={user?.email ?? "Not public"}
-            mono
-          />
-          <DetailCard
-            label="Current plan"
-            value={user?.plan ?? "FREE"}
-            highlight
-          />
-          <DetailCard
-            label="Member since"
-            value={joinedDate}
-          />
-        </div>
+          {ingest === INGEST.ERROR && (
+            <p className="ov-error-msg">⚠ {errorMsg}</p>
+          )}
 
-        {/* Coming soon strip */}
-        <div className="coming-soon-strip">
-          <span className="cs-dot" aria-hidden="true" />
-          <span className="cs-text">
-            Repo analysis dashboard — coming in next phase
-          </span>
-        </div>
+          {/* Button */}
+          <button
+            className={`ov-scan-btn ${ingest === INGEST.LOADING ? "is-loading" : ""} ${ingest === INGEST.SUCCESS ? "is-success" : ""}`}
+            onClick={handleIngest}
+            disabled={ingest === INGEST.LOADING || ingest === INGEST.SUCCESS || !repoUrl.trim()}
+          >
+            {ingest === INGEST.IDLE && <>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
+              INITIATE SCAN
+            </>}
+            {ingest === INGEST.LOADING && <>
+              <span className="ov-spinner" aria-hidden="true" />SCANNING…
+            </>}
+            {ingest === INGEST.SUCCESS && <>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+              SCAN COMPLETE
+            </>}
+            {ingest === INGEST.ERROR && <>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
+              RETRY SCAN
+            </>}
+          </button>
+
+          {/* Success preview */}
+          {ingest === INGEST.SUCCESS && repoData && (
+            <div className="ov-success-card">
+              {[
+                { label: "REPO",   value: `${repoData.owner}/${repoData.name}` },
+                { label: "FILES",  value: `${repoData.fileCount} indexed` },
+                { label: "SIZE",   value: `${repoData.sizeKb} KB` },
+                { label: "STATUS", value: repoData.status, green: true },
+              ].map(({ label, value, green }) => (
+                <div key={label} className="ov-success-row">
+                  <span className="ov-success-label">{label}</span>
+                  <span className={`ov-success-value ${green ? "is-ready" : ""}`}>{value}</span>
+                </div>
+              ))}
+              <p className="ov-redirect-note">↳ Redirecting to mission overview…</p>
+            </div>
+          )}
+
+          {/* Instructions when idle */}
+          {(ingest === INGEST.IDLE || ingest === INGEST.ERROR) && (
+            <div className="ov-instructions">
+              {[
+                ["01", "Paste any public GitHub repo URL above"],
+                ["02", "RepoMind maps the entire file tree"],
+                ["03", "Explore structure, stats and AI insights"],
+              ].map(([num, text]) => (
+                <div key={num} className="ov-instr-row">
+                  <span className="ov-instr-num">{num}</span>
+                  <span className="ov-instr-text">{text}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
+        {/* RIGHT — System info */}
+        <aside className="ov-panel ov-right">
+          <p className="ov-panel-label">SYSTEM</p>
+          <div className="ov-sys-list">
+            {[
+              ["FRONTEND",  "React 19"],
+              ["BACKEND",   "Spring Boot"],
+              ["AUTH",      "RS256 JWT"],
+              ["DATABASE",  "PostgreSQL"],
+              ["CACHE",     "Redis"],
+              ["QUEUE",     "Kafka"],
+              ["STORAGE",   "MinIO"],
+              ["VECTORS",   "Qdrant"],
+            ].map(([label, value]) => (
+              <div key={label} className="ov-sys-row">
+                <span className="ov-sys-label">{label}</span>
+                <span className="ov-sys-value">{value}</span>
+                <span className="ov-sys-dot" />
+              </div>
+            ))}
+          </div>
+
+          <p className="ov-panel-label" style={{ marginTop: "1.75rem" }}>CAPABILITIES</p>
+          <div className="ov-caps-list">
+            {["File tree mapping", "Dependency graphs", "Commit analysis",
+              "Code health score", "AI interrogation", "Team insights"].map((cap) => (
+              <div key={cap} className="ov-cap-row">
+                <span className="ov-cap-dot" />{cap}
+              </div>
+            ))}
+          </div>
+        </aside>
+
       </main>
-    </div>
-  );
-}
-
-// ─── Detail Card sub-component ───────────────────────────────────────────────
-function DetailCard({ label, value, mono, highlight }) {
-  return (
-    <div className="detail-card">
-      <span className="detail-label">{label}</span>
-      <span className={`detail-value ${mono ? "mono" : ""} ${highlight ? "highlight" : ""}`}>
-        {value}
-      </span>
     </div>
   );
 }

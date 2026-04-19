@@ -1,327 +1,417 @@
-/* ══════════════════════════════════════════════
-   OverviewScreen.css — RepoMind post-login dashboard
-   ══════════════════════════════════════════════ */
+/* ══════════════════════════════════════════════════════
+   OverviewScreen.css — RepoMind Mission Control
+   Font: DM Mono (readouts) + Bebas Neue (display titles)
+   ══════════════════════════════════════════════════════ */
 
-@import url("https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@300;400;500&display=swap");
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --bg:             #0a0c10;
-  --surface:        #161b22;
-  --surface-2:      #1c2230;
-  --border:         rgba(255, 255, 255, 0.07);
-  --border-accent:  rgba(88, 166, 255, 0.25);
+  --bg:          #080a0e;
+  --bg-panel:    #0d1117;
+  --bg-surface:  #131820;
+  --bg-inset:    #0a0d12;
 
-  --text-primary:   #e6edf3;
-  --text-secondary: #7d8590;
-  --text-muted:     #484f58;
+  --border:      rgba(255,255,255,0.06);
+  --border-md:   rgba(255,255,255,0.1);
+  --border-acc:  rgba(0, 210, 110, 0.3);
 
-  --accent:         #58a6ff;
-  --accent-dim:     rgba(88, 166, 255, 0.1);
-  --green:          #3fb950;
-  --green-dim:      rgba(63, 185, 80, 0.12);
-  --amber:          #d29922;
-  --amber-dim:      rgba(210, 153, 34, 0.12);
+  --text-pri:    #dde4ee;
+  --text-sec:    #6b7685;
+  --text-muted:  #3a4150;
 
-  --font-display:   "Syne", sans-serif;
-  --font-mono:      "JetBrains Mono", monospace;
+  --green:       #00d26a;
+  --green-dim:   rgba(0, 210, 106, 0.08);
+  --amber:       #f0a500;
+  --red:         #ff4d4d;
+  --blue:        #4da6ff;
 
-  --radius-md:      10px;
-  --radius-lg:      16px;
-  --transition:     200ms cubic-bezier(0.4, 0, 0.2, 1);
+  --font-display: "Bebas Neue", sans-serif;
+  --font-mono:    "DM Mono", monospace;
+
+  --nav-h:       52px;
+  --panel-gap:   1px;
+  --radius:      4px;
 }
 
-/* ── Root ─────────────────────────────────────── */
-.overview-root {
+/* ── Root ─────────────────────────────────────────── */
+.ov-root {
   position: relative;
   min-height: 100vh;
   background: var(--bg);
-  color: var(--text-primary);
-  font-family: system-ui, sans-serif;
+  color: var(--text-pri);
+  font-family: var(--font-mono);
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
-/* ── Grid bg ──────────────────────────────────── */
-.overview-grid {
+/* ── Scanline overlay ─────────────────────────────── */
+.ov-scanlines {
   position: fixed;
   inset: 0;
-  background-image:
-    linear-gradient(rgba(88, 166, 255, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(88, 166, 255, 0.03) 1px, transparent 1px);
-  background-size: 40px 40px;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0,0,0,0.03) 2px,
+    rgba(0,0,0,0.03) 4px
+  );
   pointer-events: none;
-  z-index: 0;
+  z-index: 100;
 }
 
-.overview-grid::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(ellipse 80% 50% at 50% 0%, var(--bg) 0%, transparent 100%);
-}
-
-/* ── Nav ──────────────────────────────────────── */
-.overview-nav {
-  position: relative;
-  z-index: 1;
+/* ── Nav ──────────────────────────────────────────── */
+.ov-nav {
+  height: var(--nav-h);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 1rem 2rem;
+  padding: 0 1.5rem;
+  background: var(--bg-panel);
   border-bottom: 1px solid var(--border);
-  background: rgba(10, 12, 16, 0.8);
-  backdrop-filter: blur(8px);
-}
-
-.nav-logo {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  font-family: var(--font-mono);
-  font-size: 14px;
-  font-weight: 500;
-}
-
-.nb { color: var(--accent); font-weight: 600; }
-.nt { color: var(--text-primary); }
-
-/* Logout button */
-.btn-logout {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  font-family: var(--font-mono);
-  font-size: 12px;
-  color: var(--text-secondary);
-  background: transparent;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  padding: 7px 14px;
-  cursor: pointer;
-  transition: color var(--transition), border-color var(--transition), background var(--transition);
-}
-
-.btn-logout:hover {
-  color: var(--text-primary);
-  border-color: rgba(248, 81, 73, 0.4);
-  background: rgba(248, 81, 73, 0.06);
-}
-
-/* ── Main ─────────────────────────────────────── */
-.overview-main {
+  flex-shrink: 0;
   position: relative;
-  z-index: 1;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 3rem 1.5rem 2rem;
-  gap: 1.5rem;
-  max-width: 680px;
-  margin: 0 auto;
-  width: 100%;
-  animation: fadeUp 0.5s cubic-bezier(0.4, 0, 0.2, 1) both;
+  z-index: 10;
 }
 
-@keyframes fadeUp {
-  from { opacity: 0; transform: translateY(20px); }
+.ov-nav-left  { display: flex; align-items: center; gap: 16px; }
+.ov-nav-right { display: flex; align-items: center; gap: 16px; }
+
+.ov-logo {
+  display: flex; align-items: center; gap: 3px;
+  font-family: var(--font-mono); font-size: 14px; font-weight: 500;
+}
+.ov-lb { color: var(--green); font-weight: 500; }
+.ov-lt { color: var(--text-pri); }
+
+.ov-nav-tag {
+  font-size: 9px; font-weight: 500; letter-spacing: 0.18em;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  padding: 3px 8px; border-radius: var(--radius);
+}
+
+.ov-status-pill {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 9px; letter-spacing: 0.14em; color: var(--green);
+}
+
+.ov-status-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--green);
+  animation: statusPulse 2.5s ease-in-out infinite;
+}
+
+@keyframes statusPulse {
+  0%,100% { opacity: 1; }
+  50%      { opacity: 0.35; }
+}
+
+.ov-logout-btn {
+  display: flex; align-items: center; gap: 6px;
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.1em;
+  color: var(--text-sec);
+  background: transparent; border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 6px 12px; cursor: pointer;
+  transition: color 150ms, border-color 150ms, background 150ms;
+}
+.ov-logout-btn:hover {
+  color: var(--red); border-color: rgba(255,77,77,0.35);
+  background: rgba(255,77,77,0.05);
+}
+
+/* ── Three-panel main ─────────────────────────────── */
+.ov-main {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 240px 1fr 220px;
+  gap: var(--panel-gap);
+  background: var(--border);   /* gap color = border color */
+  min-height: 0;
+  animation: fadeIn 0.4s ease both;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 
-/* ── Profile card ─────────────────────────────── */
-.profile-card {
-  width: 100%;
-  background: var(--surface);
+@media (max-width: 900px) {
+  .ov-main { grid-template-columns: 1fr; }
+  .ov-left, .ov-right { display: none; }
+}
+
+/* ── Panel base ───────────────────────────────────── */
+.ov-panel {
+  background: var(--bg-panel);
+  padding: 1.5rem;
+  overflow-y: auto;
+}
+
+.ov-panel-label {
+  font-size: 9px; font-weight: 500; letter-spacing: 0.2em;
+  color: var(--text-muted); margin-bottom: 1.25rem;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+/* ── LEFT panel ───────────────────────────────────── */
+.ov-profile {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 10px; text-align: center; margin-bottom: 1.5rem;
+}
+
+.ov-avatar-wrap {
+  position: relative; width: 72px; height: 72px;
+}
+
+.ov-avatar {
+  width: 72px; height: 72px; border-radius: 50%;
+  border: 1px solid var(--border-md); object-fit: cover;
+}
+
+.ov-avatar-fallback {
+  width: 72px; height: 72px; border-radius: 50%;
+  background: var(--bg-surface); border: 1px solid var(--border-md);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-display); font-size: 2rem; color: var(--green);
+}
+
+/* Rotating ring around avatar */
+.ov-avatar-ring {
+  position: absolute; inset: -4px; border-radius: 50%;
+  border: 1px dashed rgba(0,210,106,0.25);
+  animation: ringRotate 12s linear infinite;
+}
+
+@keyframes ringRotate {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+.ov-profile-name {
+  font-family: var(--font-display); font-size: 1.2rem;
+  letter-spacing: 0.05em; color: var(--text-pri);
+}
+
+.ov-profile-email {
+  font-size: 10px; color: var(--text-sec); word-break: break-all;
+}
+
+/* Readout rows */
+.ov-readouts { display: flex; flex-direction: column; gap: 2px; margin-bottom: 1.5rem; }
+
+.ov-readout {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 7px 10px;
+  background: var(--bg-inset);
   border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  padding: 2rem;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 1rem;
-  text-align: center;
+  border-radius: var(--radius);
 }
 
-/* Avatar */
-.profile-avatar-wrap {
-  position: relative;
-  width: 88px;
-  height: 88px;
+.ov-readout-label {
+  font-size: 9px; letter-spacing: 0.14em; color: var(--text-muted);
 }
 
-.profile-avatar {
-  width: 88px;
-  height: 88px;
-  border-radius: 50%;
-  border: 2px solid var(--border-accent);
-  object-fit: cover;
+.ov-readout-value {
+  font-size: 10px; font-weight: 500; color: var(--green);
 }
 
-.profile-avatar-fallback {
-  width: 88px;
-  height: 88px;
-  border-radius: 50%;
-  background: var(--surface-2);
-  border: 2px solid var(--border-accent);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+/* UID block */
+.ov-uid-block {
+  background: var(--bg-inset); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 10px;
+}
+
+.ov-uid-label {
+  display: block; font-size: 9px; letter-spacing: 0.14em;
+  color: var(--text-muted); margin-bottom: 5px;
+}
+
+.ov-uid-value {
+  font-size: 9px; color: var(--text-sec);
+  word-break: break-all; line-height: 1.5;
+}
+
+/* ── CENTER panel ─────────────────────────────────── */
+.ov-center { padding: 2rem 2.5rem; }
+
+.ov-hero { margin-bottom: 2rem; }
+
+.ov-hero-title {
   font-family: var(--font-display);
-  font-size: 2rem;
-  font-weight: 700;
-  color: var(--accent);
+  font-size: clamp(3rem, 5vw, 5rem);
+  line-height: 0.95;
+  letter-spacing: 0.04em;
+  color: var(--text-pri);
+  margin-bottom: 1rem;
 }
 
-/* GitHub badge on avatar */
-.avatar-badge {
-  position: absolute;
-  bottom: 2px;
-  right: 2px;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: var(--surface);
-  border: 1.5px solid var(--border);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-primary);
+.ov-hero-accent { color: var(--green); }
+
+.ov-hero-sub {
+  font-size: 12px; line-height: 1.7;
+  color: var(--text-sec); max-width: 460px;
 }
 
-/* Identity */
-.profile-identity { display: flex; flex-direction: column; gap: 4px; }
-
-.profile-name {
-  font-family: var(--font-display);
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: var(--text-primary);
-  letter-spacing: -0.02em;
+/* Input */
+.ov-input-wrap {
+  display: flex; align-items: center;
+  background: var(--bg-inset);
+  border: 1px solid var(--border-md);
+  border-radius: var(--radius);
+  margin-bottom: 10px;
+  transition: border-color 150ms;
+  overflow: hidden;
 }
 
-.profile-email {
-  font-family: var(--font-mono);
-  font-size: 12px;
-  color: var(--text-secondary);
+.ov-input-wrap:focus-within { border-color: var(--green); }
+.ov-input-wrap.is-error     { border-color: var(--red); }
+.ov-input-wrap.is-success   { border-color: var(--green); }
+
+.ov-input-prefix {
+  font-size: 11px; font-weight: 500; letter-spacing: 0.05em;
+  color: var(--green); padding: 0 12px;
+  border-right: 1px solid var(--border); white-space: nowrap;
+  background: rgba(0,210,106,0.04);
+  align-self: stretch; display: flex; align-items: center;
 }
 
-/* Plan badge */
-.plan-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  font-weight: 500;
-  padding: 5px 12px;
-  border-radius: 999px;
-  border: 1px solid transparent;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+.ov-input {
+  flex: 1; background: transparent; border: none; outline: none;
+  font-family: var(--font-mono); font-size: 12px;
+  color: var(--text-pri); padding: 13px 14px;
+  caret-color: var(--green);
 }
 
-.plan-badge.plan-free {
+.ov-input::placeholder { color: var(--text-muted); }
+.ov-input:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Error msg */
+.ov-error-msg {
+  font-size: 11px; color: var(--red); margin-bottom: 10px;
+  padding: 8px 12px;
+  background: rgba(255,77,77,0.06);
+  border: 1px solid rgba(255,77,77,0.2);
+  border-radius: var(--radius);
+}
+
+/* Scan button */
+.ov-scan-btn {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  width: 100%; padding: 13px;
+  font-family: var(--font-mono); font-size: 12px; font-weight: 500;
+  letter-spacing: 0.12em;
+  color: var(--bg); background: var(--green);
+  border: none; border-radius: var(--radius); cursor: pointer;
+  margin-bottom: 1.5rem;
+  transition: background 150ms, transform 100ms, opacity 150ms;
+  position: relative; overflow: hidden;
+}
+
+.ov-scan-btn::before {
+  content: "";
+  position: absolute; inset: 0;
+  background: linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.15) 50%, transparent 60%);
+  transform: translateX(-100%);
+  transition: transform 0.5s ease;
+}
+
+.ov-scan-btn:hover:not(:disabled)::before { transform: translateX(100%); }
+.ov-scan-btn:hover:not(:disabled) { background: #00e876; }
+.ov-scan-btn:active:not(:disabled) { transform: scale(0.99); }
+.ov-scan-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.ov-scan-btn.is-loading { background: var(--bg-surface); color: var(--green); border: 1px solid var(--border-acc); }
+.ov-scan-btn.is-success { background: var(--green-dim); color: var(--green); border: 1px solid var(--border-acc); }
+
+/* Spinner */
+.ov-spinner {
+  width: 14px; height: 14px; border-radius: 50%;
+  border: 2px solid rgba(0,210,106,0.2);
+  border-top-color: var(--green);
+  animation: spin 0.8s linear infinite; flex-shrink: 0;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Success card */
+.ov-success-card {
   background: var(--green-dim);
-  border-color: rgba(63, 185, 80, 0.25);
-  color: var(--green);
+  border: 1px solid var(--border-acc);
+  border-radius: var(--radius); padding: 1rem;
+  margin-bottom: 1rem;
+  animation: slideUp 0.3s ease both;
 }
 
-.plan-badge.plan-pro {
-  background: var(--accent-dim);
-  border-color: var(--border-accent);
-  color: var(--accent);
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
-.plan-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: currentColor;
+.ov-success-row {
+  display: flex; justify-content: space-between;
+  padding: 4px 0; border-bottom: 1px solid rgba(0,210,106,0.1);
+}
+.ov-success-row:last-of-type { border-bottom: none; }
+
+.ov-success-label { font-size: 9px; letter-spacing: 0.14em; color: var(--text-muted); }
+.ov-success-value { font-size: 11px; font-weight: 500; color: var(--text-pri); }
+.ov-success-value.is-ready { color: var(--green); }
+
+.ov-redirect-note {
+  font-size: 10px; color: var(--green); margin-top: 10px;
+  letter-spacing: 0.05em;
 }
 
-/* ── Details grid ─────────────────────────────── */
-.details-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-  width: 100%;
+/* Instructions */
+.ov-instructions { display: flex; flex-direction: column; gap: 6px; }
+
+.ov-instr-row {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 10px 12px;
+  background: var(--bg-inset); border: 1px solid var(--border);
+  border-radius: var(--radius);
 }
 
-@media (max-width: 480px) {
-  .details-grid { grid-template-columns: 1fr; }
+.ov-instr-num {
+  font-family: var(--font-display); font-size: 1.1rem;
+  color: var(--green); line-height: 1; flex-shrink: 0;
 }
 
-.detail-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  padding: 1rem 1.25rem;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  transition: border-color var(--transition);
-}
+.ov-instr-text { font-size: 11px; color: var(--text-sec); line-height: 1.5; }
 
-.detail-card:hover {
-  border-color: var(--border-accent);
-}
+/* ── RIGHT panel ──────────────────────────────────── */
+.ov-sys-list { display: flex; flex-direction: column; gap: 2px; margin-bottom: 0.5rem; }
 
-.detail-label {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-}
-
-.detail-value {
-  font-size: 14px;
-  color: var(--text-primary);
-  font-weight: 500;
-  word-break: break-all;
-}
-
-.detail-value.mono {
-  font-family: var(--font-mono);
-  font-size: 13px;
-}
-
-.detail-value.highlight {
-  color: var(--accent);
-  font-family: var(--font-mono);
-  font-size: 13px;
-}
-
-/* ── Coming soon strip ────────────────────────── */
-.coming-soon-strip {
-  display: flex;
-  align-items: center;
+.ov-sys-row {
+  display: flex; align-items: center;
+  padding: 6px 10px; background: var(--bg-inset);
+  border: 1px solid var(--border); border-radius: var(--radius);
   gap: 8px;
-  padding: 12px 20px;
-  background: var(--surface);
-  border: 1px dashed var(--border);
-  border-radius: var(--radius-md);
-  width: 100%;
 }
 
-.cs-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--amber);
-  flex-shrink: 0;
-  animation: pulse 2s ease-in-out infinite;
+.ov-sys-label {
+  font-size: 9px; letter-spacing: 0.14em; color: var(--text-muted); flex: 1;
 }
 
-@keyframes pulse {
-  0%, 100% { opacity: 0.4; }
-  50%       { opacity: 1; }
+.ov-sys-value { font-size: 10px; color: var(--text-sec); }
+
+.ov-sys-dot {
+  width: 5px; height: 5px; border-radius: 50%;
+  background: var(--green); opacity: 0.6; flex-shrink: 0;
 }
 
-.cs-text {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--text-muted);
+.ov-caps-list { display: flex; flex-direction: column; gap: 6px; }
+
+.ov-cap-row {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 10px; color: var(--text-sec);
+}
+
+.ov-cap-dot {
+  width: 4px; height: 4px; border-radius: 50%;
+  background: var(--green); opacity: 0.5; flex-shrink: 0;
 }
