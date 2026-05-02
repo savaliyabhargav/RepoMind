@@ -25,20 +25,77 @@ function formatBytes(bytes = 0) {
   return `${value.toFixed(value >= 10 || index === 0 ? 0 : 1)} ${units[index]}`;
 }
 
-function getFileExtension(path = "") {
-  const name = path.split("/").pop() || "";
-  const index = name.lastIndexOf(".");
-  return index > 0 ? name.slice(index + 1).toUpperCase() : "FILE";
+function buildFileTree(nodes) {
+  const root = {
+    id: "root",
+    name: "Repository",
+    path: "",
+    type: "DIRECTORY",
+    children: new Map(),
+  };
+
+  nodes.forEach((node) => {
+    const parts = node.path.split("/").filter(Boolean);
+    let current = root;
+
+    parts.forEach((part, index) => {
+      const isLeaf = index === parts.length - 1;
+      const path = parts.slice(0, index + 1).join("/");
+
+      if (!current.children.has(part)) {
+        current.children.set(part, {
+          id: isLeaf ? node.id : path,
+          name: part,
+          path,
+          type: isLeaf ? node.type : "DIRECTORY",
+          sizeBytes: isLeaf ? node.sizeBytes : 0,
+          children: new Map(),
+        });
+      }
+
+      const next = current.children.get(part);
+      if (isLeaf) {
+        next.id = node.id;
+        next.type = node.type;
+        next.sizeBytes = node.sizeBytes;
+      }
+      current = next;
+    });
+  });
+
+  function sortChildren(item) {
+    return Array.from(item.children.values())
+      .sort((a, b) => {
+        if (a.type !== b.type) return a.type === "DIRECTORY" ? -1 : 1;
+        return a.name.localeCompare(b.name);
+      })
+      .map((child) => ({
+        ...child,
+        children: sortChildren(child),
+      }));
+  }
+
+  return sortChildren(root);
+}
+
+function collectFolderPaths(items, paths = []) {
+  items.forEach((item) => {
+    if (item.type === "DIRECTORY") {
+      paths.push(item.path);
+      collectFolderPaths(item.children, paths);
+    }
+  });
+  return paths;
 }
 
 export default function RepoDetailScreen() {
   const { repoId } = useParams();
-  const [repo, setRepo] = useState(null);
   const [nodes, setNodes] = useState([]);
   const [status, setStatus] = useState(LOAD.LOADING);
   const [error, setError] = useState("");
   const [activeSection, setActiveSection] = useState("files");
   const [selectedFileId, setSelectedFileId] = useState(null);
+  const [expandedFolders, setExpandedFolders] = useState(new Set());
 
   useEffect(() => {
     let isMounted = true;
@@ -48,14 +105,15 @@ export default function RepoDetailScreen() {
       setError("");
 
       try {
-        const [repoData, treeData] = await Promise.all([
+        const [, treeData] = await Promise.all([
           repoService.getRepo(repoId),
           repoService.getRepoTree(repoId),
         ]);
 
         if (!isMounted) return;
-        setRepo(repoData);
+        const tree = buildFileTree(treeData);
         setNodes(treeData);
+        setExpandedFolders(new Set(collectFolderPaths(tree)));
         setStatus(LOAD.SUCCESS);
       } catch (err) {
         if (!isMounted) return;
@@ -75,24 +133,59 @@ export default function RepoDetailScreen() {
   const folders = nodes.filter((node) => node.type === "DIRECTORY");
   const selectedFile = files.find((node) => node.id === selectedFileId);
   const activeDockItem = DOCK_ITEMS.find((item) => item.id === activeSection);
+  const fileTree = buildFileTree(nodes);
+
+  function toggleFolder(path) {
+    setExpandedFolders((current) => {
+      const next = new Set(current);
+      if (next.has(path)) {
+        next.delete(path);
+      } else {
+        next.add(path);
+      }
+      return next;
+    });
+  }
+
+  function renderTreeItems(items, depth = 0) {
+    return items.map((item) => {
+      const isFolder = item.type === "DIRECTORY";
+      const isExpanded = expandedFolders.has(item.path);
+      const isSelected = item.id === selectedFileId;
+
+      return (
+        <div key={item.path || item.id} className="workspace-tree-group">
+          <button
+            type="button"
+            className={`workspace-tree-row ${isFolder ? "is-folder" : "is-file"} ${isSelected ? "is-selected" : ""}`}
+            style={{ "--tree-depth": depth }}
+            onClick={() => {
+              if (isFolder) {
+                toggleFolder(item.path);
+              } else {
+                setSelectedFileId(item.id);
+              }
+            }}
+          >
+            <span className={`workspace-tree-chevron ${isFolder && isExpanded ? "is-open" : ""}`}>
+              {isFolder ? ">" : ""}
+            </span>
+            <span className="workspace-tree-name">{item.name}</span>
+            {!isFolder && <span className="workspace-tree-size">{formatBytes(item.sizeBytes)}</span>}
+          </button>
+
+          {isFolder && isExpanded && item.children.length > 0 && (
+            <div className="workspace-tree-children">
+              {renderTreeItems(item.children, depth + 1)}
+            </div>
+          )}
+        </div>
+      );
+    });
+  }
 
   return (
     <div className="workspace-root">
-      <div className="workspace-wallpaper" />
-
-      <header className="workspace-menu-bar">
-        <div className="workspace-menu-left">
-          <span className="workspace-apple">RepoMind</span>
-          <span>Workspace</span>
-          <span>File</span>
-          <span>View</span>
-        </div>
-        <div className="workspace-menu-right">
-          <span>{repo?.status || "Loading"}</span>
-          <Link to="/analyze">New scan</Link>
-        </div>
-      </header>
-
       {status === LOAD.LOADING && (
         <main className="workspace-state">
           <span className="workspace-loader" />
@@ -107,74 +200,36 @@ export default function RepoDetailScreen() {
         </main>
       )}
 
-      {status === LOAD.SUCCESS && repo && (
-        <main className="workspace-window">
-          <section className="workspace-titlebar">
-            <div className="workspace-traffic">
-              <span className="traffic-red" />
-              <span className="traffic-yellow" />
-              <span className="traffic-green" />
-            </div>
-            <div className="workspace-title">
-              <strong>{repo.owner}/{repo.name}</strong>
-              <span>{repo.defaultBranch || "main"} branch</span>
-            </div>
-            <a href={repo.url} target="_blank" rel="noreferrer">GitHub</a>
-          </section>
-
-          <section className="workspace-content">
-            {activeSection === "files" && (
-              <aside className="workspace-sidebar">
-                <div className="workspace-sidebar-head">
-                  <span>Explorer</span>
-                  <strong>{files.length} files</strong>
-                </div>
-
-                <div className="workspace-file-list">
-                  {nodes.map((node) => {
-                    const isFile = node.type === "FILE";
-                    const isSelected = node.id === selectedFileId;
-
-                    return (
-                      <button
-                        key={node.id}
-                        type="button"
-                        className={`workspace-file-row ${isFile ? "is-file" : "is-folder"} ${isSelected ? "is-selected" : ""}`}
-                        style={{ "--node-depth": node.depth ?? 0 }}
-                        onClick={() => isFile && setSelectedFileId(node.id)}
-                        disabled={!isFile}
-                      >
-                        <span className="workspace-file-icon">{isFile ? getFileExtension(node.path) : "DIR"}</span>
-                        <span className="workspace-file-name">{node.path}</span>
-                        {isFile && <span className="workspace-file-size">{formatBytes(node.sizeBytes)}</span>}
-                      </button>
-                    );
-                  })}
-                </div>
-              </aside>
-            )}
-
-            <section className="workspace-stage">
-              <div className="workspace-stage-toolbar">
-                <div>
-                  <span>{activeDockItem?.label}</span>
-                  <strong>{selectedFile ? selectedFile.name : "Workspace"}</strong>
-                </div>
-                <span>{files.length} files / {folders.length} folders</span>
+      {status === LOAD.SUCCESS && (
+        <main className={`workspace-shell ${activeSection !== "files" ? "is-blank-section" : ""}`}>
+          {activeSection === "files" && (
+            <aside className="workspace-file-panel">
+              <div className="workspace-file-panel-head">
+                <span>Files</span>
+                <strong>{files.length} files / {folders.length} folders</strong>
               </div>
 
-              <div className="workspace-blank-canvas">
-                {activeSection === "files" && selectedFile && (
-                  <div className="workspace-selection-hint">
-                    <span>{selectedFile.path}</span>
-                  </div>
-                )}
+              <div className="workspace-file-scroll">
+                {renderTreeItems(fileTree)}
               </div>
-            </section>
+            </aside>
+          )}
+
+          <section className="workspace-main-panel">
+            <div className="workspace-main-head">
+              <div>
+                <span>{activeDockItem?.label}</span>
+                <strong>{selectedFile ? selectedFile.name : "Workspace"}</strong>
+              </div>
+              {activeSection === "files" && selectedFile && <span>{selectedFile.path}</span>}
+            </div>
+
+            <div className="workspace-empty-area" />
           </section>
         </main>
       )}
 
+      <div className="workspace-dock-hotspot" />
       <nav className="workspace-dock" aria-label="Workspace navigation">
         {DOCK_ITEMS.map((item) => (
           <button
