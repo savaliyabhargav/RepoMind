@@ -14,6 +14,8 @@ public interface FileNodeRepository extends JpaRepository<FileNode, UUID> {
 
     List<FileNode> findByRepoId(UUID repoId);
 
+    List<FileNode> findByRepoIdOrderByPathAsc(UUID repoId);
+
     List<FileNode> findByRepoIdAndIsInScopeTrue(UUID repoId);
 
     List<FileNode> findByRepoIdAndType(UUID repoId, String type);

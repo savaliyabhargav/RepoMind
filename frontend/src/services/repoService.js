@@ -43,6 +43,16 @@ const repoService = {
     const response = await api.post("/repo/ingest", { url, userId });
     return response.data;
   },
+
+  getRepo: async (repoId) => {
+    const response = await api.get(`/repo/${repoId}`);
+    return response.data;
+  },
+
+  getRepoTree: async (repoId) => {
+    const response = await api.get(`/repo/${repoId}/tree`);
+    return response.data;
+  },
 };
 
 export default repoService;
