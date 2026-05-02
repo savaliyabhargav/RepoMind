@@ -69,272 +69,221 @@ export default function OverviewScreen() {
   }, [repoUrl, user, navigate]);
 
   return (
-    <div className="ov-root">
-      <div className="ov-scanlines" aria-hidden="true" />
-      <div className="ov-grid" aria-hidden="true" />
+    <div className="overview-root">
+      <div className="overview-backdrop" aria-hidden="true" />
+      <div className="overview-grid" aria-hidden="true" />
 
-      <header className="ov-nav">
-        <div className="ov-nav-left">
-          <div className="ov-logo">
-            <span className="ov-lb">[</span>
-            <span className="ov-lt">RepoMind</span>
-            <span className="ov-lb">]</span>
+      <aside className="overview-sidebar">
+        <div className="overview-sidebar-brand">
+          <div className="overview-sidebar-mark">RM</div>
+          <div>
+            <strong>RepoMind</strong>
+            <span>Mission workspace</span>
           </div>
-          <div className="ov-nav-tag">MISSION CONTROL</div>
         </div>
-        <div className="ov-nav-right">
-          <div className="ov-status-pill">
-            <span className="ov-status-dot" />
-            SYSTEMS NOMINAL
+
+        <div className="overview-sidebar-section">
+          <p className="overview-section-label">Operator</p>
+          <div className="overview-profile-card">
+            {user?.avatarUrl ? (
+              <img src={user.avatarUrl} alt={`${user.username} avatar`} className="overview-avatar" />
+            ) : (
+              <div className="overview-avatar overview-avatar-fallback">
+                {user?.username?.[0]?.toUpperCase() ?? "?"}
+              </div>
+            )}
+            <strong>{user?.username ?? "-"}</strong>
+            {user?.email && <span>{user.email}</span>}
           </div>
-          <button className="ov-logout-btn" onClick={handleLogout}>
-            <svg
-              width="13"
-              height="13"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-            >
-              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-              <polyline points="16 17 21 12 16 7" />
-              <line x1="21" y1="12" x2="9" y2="12" />
-            </svg>
-            LOGOUT
-          </button>
         </div>
-      </header>
 
-      <main className="ov-main">
-        <aside className="ov-panel ov-left">
-          <p className="ov-panel-label">OPERATOR</p>
-
-          <div className="ov-profile">
-            <div className="ov-avatar-wrap">
-              {user?.avatarUrl ? (
-                <img src={user.avatarUrl} alt={`${user.username} avatar`} className="ov-avatar" />
-              ) : (
-                <div className="ov-avatar-fallback">
-                  {user?.username?.[0]?.toUpperCase() ?? "?"}
-                </div>
-              )}
-              <div className="ov-avatar-ring" aria-hidden="true" />
-            </div>
-            <p className="ov-profile-name">{user?.username ?? "-"}</p>
-            {user?.email && <p className="ov-profile-email">{user.email}</p>}
-          </div>
-
-          <div className="ov-readouts">
+        <div className="overview-sidebar-section">
+          <p className="overview-section-label">Workspace facts</p>
+          <div className="overview-sidebar-list">
             {[
-              { label: "CLEARANCE", value: user?.plan ?? "FREE" },
-              { label: "ENROLLED", value: joinedDate },
-              { label: "PROVIDER", value: "GITHUB" },
-              { label: "STATUS", value: "ACTIVE" },
-            ].map(({ label, value }) => (
-              <div key={label} className="ov-readout">
-                <span className="ov-readout-label">{label}</span>
-                <span className="ov-readout-value">{value}</span>
-              </div>
-            ))}
-          </div>
-
-          <div className="ov-uid-block">
-            <span className="ov-uid-label">UID</span>
-            <span className="ov-uid-value">{user?.id ?? "-"}</span>
-          </div>
-        </aside>
-
-        <section className="ov-panel ov-center">
-          <p className="ov-panel-label">TARGET ACQUISITION</p>
-
-          <div className="ov-hero">
-            <div>
-              <span className="ov-kicker">Repository ingestion</span>
-              <h1 className="ov-hero-title">
-                Scan a
-                <span className="ov-hero-accent"> GitHub repository</span>
-              </h1>
-              <p className="ov-hero-sub">
-                Enter a public repository URL to begin analysis. The UI stays simple here while
-                your existing backend ingestion flow continues unchanged.
-              </p>
-            </div>
-
-            <div className="ov-hero-meta">
-              <div className="ov-hero-stat">
-                <span className="ov-hero-stat-label">Pipeline</span>
-                <strong>Ingest to analysis</strong>
-              </div>
-              <div className="ov-hero-stat">
-                <span className="ov-hero-stat-label">Mode</span>
-                <strong>Current stage only</strong>
-              </div>
-            </div>
-          </div>
-
-          <div
-            className={`ov-input-wrap ${ingest === INGEST.ERROR ? "is-error" : ""} ${ingest === INGEST.SUCCESS ? "is-success" : ""}`}
-          >
-            <span className="ov-input-prefix">URL://</span>
-            <input
-              className="ov-input"
-              type="url"
-              placeholder="github.com/owner/repository"
-              value={repoUrl}
-              onChange={(e) => {
-                setRepoUrl(e.target.value);
-                if (ingest === INGEST.ERROR) setIngest(INGEST.IDLE);
-              }}
-              onKeyDown={(e) => e.key === "Enter" && handleIngest()}
-              disabled={ingest === INGEST.LOADING || ingest === INGEST.SUCCESS}
-              spellCheck={false}
-              autoComplete="off"
-              aria-label="GitHub repository URL"
-            />
-          </div>
-
-          {ingest === INGEST.ERROR && (
-            <p className="ov-error-msg">Warning: {errorMsg}</p>
-          )}
-
-          <button
-            className={`ov-scan-btn ${ingest === INGEST.LOADING ? "is-loading" : ""} ${ingest === INGEST.SUCCESS ? "is-success" : ""}`}
-            onClick={handleIngest}
-            disabled={ingest === INGEST.LOADING || ingest === INGEST.SUCCESS || !repoUrl.trim()}
-          >
-            {ingest === INGEST.IDLE && (
-              <>
-                <svg
-                  width="15"
-                  height="15"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                >
-                  <circle cx="11" cy="11" r="8" />
-                  <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                </svg>
-                INITIATE SCAN
-              </>
-            )}
-            {ingest === INGEST.LOADING && (
-              <>
-                <span className="ov-spinner" aria-hidden="true" />
-                SCANNING...
-              </>
-            )}
-            {ingest === INGEST.SUCCESS && (
-              <>
-                <svg
-                  width="15"
-                  height="15"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                >
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
-                SCAN COMPLETE
-              </>
-            )}
-            {ingest === INGEST.ERROR && (
-              <>
-                <svg
-                  width="15"
-                  height="15"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                >
-                  <circle cx="11" cy="11" r="8" />
-                  <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                </svg>
-                RETRY SCAN
-              </>
-            )}
-          </button>
-
-          {ingest === INGEST.SUCCESS && repoData && (
-            <div className="ov-success-card">
-              {[
-                { label: "REPO", value: `${repoData.owner}/${repoData.name}` },
-                { label: "FILES", value: `${repoData.fileCount} indexed` },
-                { label: "SIZE", value: `${repoData.sizeKb} KB` },
-                { label: "STATUS", value: repoData.status, green: true },
-              ].map(({ label, value, green }) => (
-                <div key={label} className="ov-success-row">
-                  <span className="ov-success-label">{label}</span>
-                  <span className={`ov-success-value ${green ? "is-ready" : ""}`}>{value}</span>
-                </div>
-              ))}
-              <p className="ov-redirect-note">Redirecting to mission overview...</p>
-            </div>
-          )}
-
-          {(ingest === INGEST.IDLE || ingest === INGEST.ERROR) && (
-            <div className="ov-instructions">
-              {[
-                ["01", "Paste any public GitHub repo URL above"],
-                ["02", "RepoMind maps the entire file tree"],
-                ["03", "Explore structure, stats and AI insights"],
-              ].map(([num, text]) => (
-                <div key={num} className="ov-instr-row">
-                  <span className="ov-instr-num">{num}</span>
-                  <span className="ov-instr-text">{text}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
-
-        <aside className="ov-panel ov-right">
-          <p className="ov-panel-label">SYSTEM</p>
-          <div className="ov-sys-list">
-            {[
-              ["FRONTEND", "React 19"],
-              ["BACKEND", "Spring Boot"],
-              ["AUTH", "RS256 JWT"],
-              ["DATABASE", "PostgreSQL"],
-              ["CACHE", "Redis"],
-              ["QUEUE", "Kafka"],
-              ["STORAGE", "MinIO"],
-              ["VECTORS", "Qdrant"],
+              ["Plan", user?.plan ?? "FREE"],
+              ["Joined", joinedDate],
+              ["Provider", "GITHUB"],
+              ["Status", "ACTIVE"],
             ].map(([label, value]) => (
-              <div key={label} className="ov-sys-row">
-                <span className="ov-sys-label">{label}</span>
-                <span className="ov-sys-value">{value}</span>
-                <span className="ov-sys-dot" />
+              <div key={label} className="overview-sidebar-item">
+                <span>{label}</span>
+                <strong>{value}</strong>
               </div>
             ))}
+          </div>
+        </div>
+
+        <div className="overview-sidebar-section">
+          <p className="overview-section-label">Stack</p>
+          <div className="overview-chip-list">
+            {["React 19", "Spring Boot", "PostgreSQL", "Redis", "Kafka", "Qdrant"].map((item) => (
+              <span key={item}>{item}</span>
+            ))}
+          </div>
+        </div>
+      </aside>
+
+      <div className="overview-main">
+        <header className="overview-topbar">
+          <div>
+            <p className="overview-kicker">Repository ingestion</p>
+            <h1>Analyze a repository without changing the pipeline underneath</h1>
           </div>
 
-          <p className="ov-panel-label" style={{ marginTop: "1.75rem" }}>
-            CAPABILITIES
-          </p>
-          <div className="ov-caps-list">
-            {[
-              "File tree mapping",
-              "Dependency graphs",
-              "Commit analysis",
-              "Code health score",
-              "AI interrogation",
-              "Team insights",
-            ].map((cap) => (
-              <div key={cap} className="ov-cap-row">
-                <span className="ov-cap-dot" />
-                {cap}
-              </div>
-            ))}
+          <div className="overview-topbar-actions">
+            <div className="overview-status-badge">
+              <span className="overview-status-dot" />
+              Systems nominal
+            </div>
+            <button className="overview-logout" onClick={handleLogout}>
+              Logout
+            </button>
           </div>
-        </aside>
-      </main>
+        </header>
+
+        <section className="overview-hero-grid">
+          <article className="overview-ingest-card">
+            <div className="overview-card-head">
+              <div>
+                <p className="overview-mini-label">Current task</p>
+                <h2>Connect a GitHub repository and start the analysis workflow</h2>
+              </div>
+              <div className="overview-stage-pill">Stage 1 · Ingestion</div>
+            </div>
+
+            <p className="overview-card-copy">
+              Paste a public GitHub repository URL. RepoMind will keep the same backend and auth
+              behavior, then send the repo into your existing ingestion flow.
+            </p>
+
+            <div
+              className={`overview-input-shell ${ingest === INGEST.ERROR ? "is-error" : ""} ${ingest === INGEST.SUCCESS ? "is-success" : ""}`}
+            >
+              <label className="overview-input-label" htmlFor="repo-url">
+                Repository URL
+              </label>
+              <div className="overview-input-row">
+                <input
+                  id="repo-url"
+                  className="overview-input"
+                  type="url"
+                  placeholder="https://github.com/owner/repository"
+                  value={repoUrl}
+                  onChange={(e) => {
+                    setRepoUrl(e.target.value);
+                    if (ingest === INGEST.ERROR) setIngest(INGEST.IDLE);
+                  }}
+                  onKeyDown={(e) => e.key === "Enter" && handleIngest()}
+                  disabled={ingest === INGEST.LOADING || ingest === INGEST.SUCCESS}
+                  spellCheck={false}
+                  autoComplete="off"
+                  aria-label="GitHub repository URL"
+                />
+                <button
+                  className={`overview-submit ${ingest === INGEST.LOADING ? "is-loading" : ""} ${ingest === INGEST.SUCCESS ? "is-success" : ""}`}
+                  onClick={handleIngest}
+                  disabled={ingest === INGEST.LOADING || ingest === INGEST.SUCCESS || !repoUrl.trim()}
+                >
+                  {ingest === INGEST.LOADING ? (
+                    <>
+                      <span className="overview-spinner" aria-hidden="true" />
+                      Scanning
+                    </>
+                  ) : ingest === INGEST.SUCCESS ? (
+                    "Complete"
+                  ) : ingest === INGEST.ERROR ? (
+                    "Retry"
+                  ) : (
+                    "Start analysis"
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {ingest === INGEST.ERROR && (
+              <p className="overview-feedback error">{errorMsg}</p>
+            )}
+
+            {ingest === INGEST.SUCCESS && repoData && (
+              <div className="overview-result-card">
+                {[
+                  ["Repository", `${repoData.owner}/${repoData.name}`],
+                  ["Files indexed", `${repoData.fileCount}`],
+                  ["Size", `${repoData.sizeKb} KB`],
+                  ["Status", repoData.status],
+                ].map(([label, value]) => (
+                  <div key={label} className="overview-result-row">
+                    <span>{label}</span>
+                    <strong>{value}</strong>
+                  </div>
+                ))}
+                <p className="overview-feedback success">Redirecting to the repository workspace...</p>
+              </div>
+            )}
+
+            {(ingest === INGEST.IDLE || ingest === INGEST.ERROR) && (
+              <div className="overview-steps">
+                {[
+                  ["01", "Paste a valid public GitHub repository link"],
+                  ["02", "RepoMind sends it through the current ingest logic"],
+                  ["03", "Move into the analysis workspace after success"],
+                ].map(([step, text]) => (
+                  <div key={step} className="overview-step">
+                    <span>{step}</span>
+                    <p>{text}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </article>
+
+          <aside className="overview-insight-column">
+            <section className="overview-panel">
+              <div className="overview-panel-head">
+                <p className="overview-mini-label">Capabilities</p>
+                <span>Current UI foundation</span>
+              </div>
+
+              <div className="overview-feature-list">
+                {[
+                  "Repository tree mapping",
+                  "Dependency and architecture context",
+                  "AI analysis preparation",
+                  "Future-ready design system for the full app",
+                ].map((item) => (
+                  <div key={item} className="overview-feature-item">
+                    <span className="overview-feature-dot" />
+                    <p>{item}</p>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <section className="overview-panel">
+              <div className="overview-panel-head">
+                <p className="overview-mini-label">Session</p>
+                <span>Connected account</span>
+              </div>
+
+              <div className="overview-user-meta">
+                <div className="overview-user-meta-row">
+                  <span>User ID</span>
+                  <strong>{user?.id ?? "-"}</strong>
+                </div>
+                <div className="overview-user-meta-row">
+                  <span>Auth provider</span>
+                  <strong>GitHub OAuth</strong>
+                </div>
+                <div className="overview-user-meta-row">
+                  <span>Token mode</span>
+                  <strong>JWT + refresh flow</strong>
+                </div>
+              </div>
+            </section>
+          </aside>
+        </section>
+      </div>
     </div>
   );
 }
