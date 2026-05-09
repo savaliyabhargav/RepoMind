@@ -49,3 +49,10 @@ management:
       base-path: /actuator
       exposure:
         include: health,info
+
+app:
+  ai:
+    provider: ${AI_PROVIDER:NVIDIA_DEV}
+    nvidia:
+      base-url: ${NVIDIA_BASE_URL:https://integrate.api.nvidia.com/v1}
+      api-key: ${NVIDIA_API_KEY:}
