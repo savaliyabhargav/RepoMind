@@ -52,6 +52,9 @@ public class Analysis {
     @Column(columnDefinition = "jsonb")
     private String result;
 
+    @Column(name = "error_msg")
+    private String errorMsg;
+
     @Builder.Default
     @Column(name = "tokens_used")
     private Integer tokensUsed = 0;
