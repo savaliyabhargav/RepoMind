@@ -53,6 +53,26 @@ const repoService = {
     const response = await api.get(`/repo/${repoId}/tree`);
     return response.data;
   },
+
+  startAnalysis: async ({ repoId, userId, aiProvider = "NVIDIA_DEV" }) => {
+    const response = await api.post("/analyses", { repoId, userId, aiProvider });
+    return response.data;
+  },
+
+  getAnalysisStages: async (analysisId) => {
+    const response = await api.get(`/analyses/${analysisId}/stages`);
+    return response.data;
+  },
+
+  indexRepoVectors: async ({ repoId, userId, aiProvider = "NVIDIA_DEV" }) => {
+    const response = await api.post("/retrieval/index", { repoId, userId, aiProvider });
+    return response.data;
+  },
+
+  searchRepoVectors: async ({ repoId, query, topK = 8, aiProvider = "NVIDIA_DEV" }) => {
+    const response = await api.post("/retrieval/search", { repoId, query, topK, aiProvider });
+    return response.data;
+  },
 };
 
 export default repoService;

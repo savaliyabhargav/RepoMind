@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import { useAuthStore } from "../store/authStore";
 import repoService from "../services/repoService";
 import "./RepoDetailScreen.css";
 
@@ -90,12 +91,23 @@ function collectFolderPaths(items, paths = []) {
 
 export default function RepoDetailScreen() {
   const { repoId } = useParams();
+  const userId = useAuthStore((s) => s.user?.id);
   const [nodes, setNodes] = useState([]);
   const [status, setStatus] = useState(LOAD.LOADING);
   const [error, setError] = useState("");
   const [activeSection, setActiveSection] = useState("files");
   const [selectedFileId, setSelectedFileId] = useState(null);
   const [expandedFolders, setExpandedFolders] = useState(new Set());
+  const [aiProvider, setAiProvider] = useState("NVIDIA_DEV");
+  const [analysisId, setAnalysisId] = useState("");
+  const [searchQuery, setSearchQuery] = useState("How does request flow through controllers and services?");
+  const [topK, setTopK] = useState(8);
+  const [testBusy, setTestBusy] = useState(false);
+  const [testError, setTestError] = useState("");
+  const [analysisResult, setAnalysisResult] = useState(null);
+  const [indexResult, setIndexResult] = useState(null);
+  const [searchResult, setSearchResult] = useState(null);
+  const [stageResult, setStageResult] = useState(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -184,6 +196,80 @@ export default function RepoDetailScreen() {
     });
   }
 
+  async function runStartAnalysis() {
+    if (!userId) {
+      setTestError("Missing user session. Please login again.");
+      return;
+    }
+    setTestBusy(true);
+    setTestError("");
+    try {
+      const result = await repoService.startAnalysis({ repoId, userId, aiProvider });
+      setAnalysisResult(result);
+      setAnalysisId(result.id || "");
+    } catch (err) {
+      setTestError(err.response?.data?.message || err.response?.data?.error || "Failed to start analysis.");
+    } finally {
+      setTestBusy(false);
+    }
+  }
+
+  async function runFetchStages() {
+    if (!analysisId.trim()) {
+      setTestError("Enter analysis ID first.");
+      return;
+    }
+    setTestBusy(true);
+    setTestError("");
+    try {
+      const result = await repoService.getAnalysisStages(analysisId.trim());
+      setStageResult(result);
+    } catch (err) {
+      setTestError(err.response?.data?.message || "Failed to fetch stage data.");
+    } finally {
+      setTestBusy(false);
+    }
+  }
+
+  async function runIndexVectors() {
+    if (!userId) {
+      setTestError("Missing user session. Please login again.");
+      return;
+    }
+    setTestBusy(true);
+    setTestError("");
+    try {
+      const result = await repoService.indexRepoVectors({ repoId, userId, aiProvider });
+      setIndexResult(result);
+    } catch (err) {
+      setTestError(err.response?.data?.message || "Failed to index vectors.");
+    } finally {
+      setTestBusy(false);
+    }
+  }
+
+  async function runSearchVectors() {
+    if (!searchQuery.trim()) {
+      setTestError("Search query is required.");
+      return;
+    }
+    setTestBusy(true);
+    setTestError("");
+    try {
+      const result = await repoService.searchRepoVectors({
+        repoId,
+        query: searchQuery.trim(),
+        topK: Number(topK) || 8,
+        aiProvider,
+      });
+      setSearchResult(result);
+    } catch (err) {
+      setTestError(err.response?.data?.message || "Failed to search vectors.");
+    } finally {
+      setTestBusy(false);
+    }
+  }
+
   return (
     <div className="workspace-root">
       {status === LOAD.LOADING && (
@@ -224,7 +310,50 @@ export default function RepoDetailScreen() {
               {activeSection === "files" && selectedFile && <span>{selectedFile.path}</span>}
             </div>
 
-            <div className="workspace-empty-area" />
+            {activeSection !== "settings" && <div className="workspace-empty-area" />}
+            {activeSection === "settings" && (
+              <div className="workspace-test-area">
+                <div className="workspace-test-head">
+                  <h3>Pipeline Testing</h3>
+                  <p>Run analysis and retrieval APIs for this repository without leaving workspace.</p>
+                </div>
+
+                <div className="workspace-test-grid">
+                  <label>
+                    AI Provider
+                    <input value={aiProvider} onChange={(e) => setAiProvider(e.target.value)} />
+                  </label>
+                  <label>
+                    Analysis ID
+                    <input value={analysisId} onChange={(e) => setAnalysisId(e.target.value)} placeholder="auto-filled after start analysis" />
+                  </label>
+                  <label>
+                    Top K
+                    <input type="number" min="1" max="25" value={topK} onChange={(e) => setTopK(e.target.value)} />
+                  </label>
+                  <label className="is-wide">
+                    Search Query
+                    <input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+                  </label>
+                </div>
+
+                <div className="workspace-test-actions">
+                  <button type="button" onClick={runStartAnalysis} disabled={testBusy}>Start Analysis</button>
+                  <button type="button" onClick={runFetchStages} disabled={testBusy}>Get Stages</button>
+                  <button type="button" onClick={runIndexVectors} disabled={testBusy}>Index Vectors</button>
+                  <button type="button" onClick={runSearchVectors} disabled={testBusy}>Search Vectors</button>
+                </div>
+
+                {testError && <p className="workspace-test-error">{testError}</p>}
+
+                <div className="workspace-test-results">
+                  <ResultBox title="Analysis Response" value={analysisResult} />
+                  <ResultBox title="Stage Response" value={stageResult} />
+                  <ResultBox title="Index Response" value={indexResult} />
+                  <ResultBox title="Search Response" value={searchResult} />
+                </div>
+              </div>
+            )}
           </section>
         </main>
       )}
@@ -245,5 +374,14 @@ export default function RepoDetailScreen() {
         ))}
       </nav>
     </div>
+  );
+}
+
+function ResultBox({ title, value }) {
+  return (
+    <article className="workspace-result-box">
+      <h4>{title}</h4>
+      <pre>{value ? JSON.stringify(value, null, 2) : "No data yet."}</pre>
+    </article>
   );
 }

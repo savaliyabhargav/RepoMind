@@ -193,6 +193,130 @@
   background-size: 28px 28px;
 }
 
+.workspace-test-area {
+  min-height: 0;
+  overflow: auto;
+  padding: 18px 16px 92px;
+  display: grid;
+  gap: 14px;
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    rgba(10, 10, 11, 0.7);
+  background-size: 24px 24px;
+}
+
+.workspace-test-head h3 {
+  margin: 0;
+  color: #e9eef9;
+  font-size: 17px;
+}
+
+.workspace-test-head p {
+  margin: 4px 0 0;
+  color: #97a5bb;
+  font: 500 12px/1.5 "IBM Plex Mono", monospace;
+}
+
+.workspace-test-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.workspace-test-grid label {
+  display: grid;
+  gap: 6px;
+  color: #a8b3c5;
+  font: 600 11px/1.4 "IBM Plex Mono", monospace;
+  text-transform: uppercase;
+}
+
+.workspace-test-grid label.is-wide {
+  grid-column: 1 / -1;
+}
+
+.workspace-test-grid input {
+  width: 100%;
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 10px;
+  color: #e7edf7;
+  background: rgba(20, 20, 22, 0.92);
+  font: 500 12px/1 "IBM Plex Mono", monospace;
+}
+
+.workspace-test-grid input:focus {
+  outline: none;
+  border-color: rgba(255, 255, 255, 0.34);
+}
+
+.workspace-test-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.workspace-test-actions button {
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid rgba(255, 255, 255, 0.19);
+  border-radius: 9px;
+  color: #eaf0fa;
+  background: rgba(42, 42, 46, 0.9);
+  font: 700 11px/1 "IBM Plex Mono", monospace;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.workspace-test-actions button:hover {
+  background: rgba(58, 58, 62, 0.96);
+}
+
+.workspace-test-actions button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.workspace-test-error {
+  margin: 0;
+  color: #ff9bac;
+  font: 600 12px/1.5 "IBM Plex Mono", monospace;
+}
+
+.workspace-test-results {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.workspace-result-box {
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 12px;
+  background: rgba(14, 14, 16, 0.92);
+  overflow: hidden;
+}
+
+.workspace-result-box h4 {
+  margin: 0;
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.09);
+  color: #dce5f4;
+  font: 700 11px/1 "IBM Plex Mono", monospace;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.workspace-result-box pre {
+  margin: 0;
+  padding: 10px 12px;
+  max-height: 230px;
+  overflow: auto;
+  color: #b8c6dc;
+  font: 500 11px/1.5 "IBM Plex Mono", monospace;
+}
+
 .workspace-state {
   display: grid;
   place-items: center;
@@ -322,5 +446,13 @@
   .workspace-dock-item {
     width: 46px;
     height: 46px;
+  }
+
+  .workspace-test-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .workspace-test-results {
+    grid-template-columns: 1fr;
   }
 }

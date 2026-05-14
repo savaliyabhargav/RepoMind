@@ -20,6 +20,7 @@ import com.repomind.backend.service.ai.dto.AiEmbeddingRequest;
 import com.repomind.backend.service.ai.dto.AiEmbeddingResponse;
 import com.repomind.backend.service.ai.dto.AiGenerationRequest;
 import com.repomind.backend.service.ai.dto.AiGenerationResponse;
+import com.repomind.backend.service.retrieval.RetrievalService;
 import com.repomind.backend.service.analysis.dto.AnalysisResponse;
 import com.repomind.backend.service.analysis.dto.AnalysisStageResponse;
 import org.slf4j.Logger;
@@ -63,6 +64,7 @@ public class AnalysisPipelineService {
     private final AiProviderRouter aiProviderRouter;
     private final AiCallLogRepository aiCallLogRepository;
     private final ObjectMapper objectMapper;
+    private final RetrievalService retrievalService;
 
     public AnalysisPipelineService(
             AnalysisRepository analysisRepository,
@@ -72,7 +74,8 @@ public class AnalysisPipelineService {
             FileNodeRepository fileNodeRepository,
             AiProviderRouter aiProviderRouter,
             AiCallLogRepository aiCallLogRepository,
-            ObjectMapper objectMapper
+            ObjectMapper objectMapper,
+            RetrievalService retrievalService
     ) {
         this.analysisRepository = analysisRepository;
         this.analysisStageRepository = analysisStageRepository;
@@ -82,6 +85,7 @@ public class AnalysisPipelineService {
         this.aiProviderRouter = aiProviderRouter;
         this.aiCallLogRepository = aiCallLogRepository;
         this.objectMapper = objectMapper;
+        this.retrievalService = retrievalService;
     }
 
     @Transactional
@@ -374,38 +378,32 @@ public class AnalysisPipelineService {
     }
 
     private StageExecutionResult buildEmbeddingStage(Analysis analysis, List<FileNode> files, Map<String, Object> previousStages) {
-        int chunkSize = 1500;
-        int overlap = 200;
-        int embedded = 0;
-        int totalChunks = 0;
-        int tokensUsed = 0;
-
-        List<FileNode> candidates = files.stream()
-                .filter(file -> Optional.ofNullable(file.getSizeBytes()).orElse(0L) <= MAX_EMBED_FILE_SIZE_BYTES)
-                .toList();
-
-        for (FileNode file : candidates) {
-            long size = Optional.ofNullable(file.getSizeBytes()).orElse(0L);
-            int chunks = Math.max(1, (int) Math.ceil(size / (double) chunkSize));
-            totalChunks += chunks;
-            String embeddingInput = "path=" + file.getPath() + "\nrole=" + Optional.ofNullable(file.getRoleSummary()).orElse(inferRole(file.getPath()));
-            AiEmbeddingResponse embeddingResponse = executeEmbeddingCall(analysis, "EMBEDDING", embeddingInput);
-            tokensUsed += embeddingResponse.usage().total();
-            String embeddingId = "nvidia:" + file.getId() + ":" + embeddingResponse.embedding().size();
-            fileNodeRepository.updateEmbeddingId(file.getId(), embeddingId);
-            embedded++;
-        }
-
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("embeddedFiles", embedded);
-        result.put("totalChunks", totalChunks);
-        result.put("skippedLargeFiles", files.size() - candidates.size());
-        result.put("maxFileSizeBytes", MAX_EMBED_FILE_SIZE_BYTES);
-        result.put("chunkSizeChars", chunkSize);
-        result.put("overlapChars", overlap);
-        result.put("summary", "Embeddings generated with provider API and IDs persisted.");
         result.put("dependsOn", previousStages.keySet());
-        return new StageExecutionResult(result, tokensUsed);
+        try {
+            RetrievalService.IndexResult indexResult = retrievalService.indexRepo(
+                    analysis.getRepo().getId(),
+                    analysis.getUser().getId(),
+                    analysis.getAiProvider()
+            );
+            result.put("embeddedFiles", indexResult.embeddedFiles());
+            result.put("totalChunks", indexResult.embeddedChunks());
+            result.put("skippedFiles", indexResult.skippedFiles());
+            result.put("chunkSizeChars", indexResult.chunkSizeChars());
+            result.put("overlapChars", indexResult.chunkOverlapChars());
+            result.put("status", "COMPLETED");
+            result.put("summary", "Embeddings generated and upserted to Qdrant with repo-scoped payload metadata.");
+            return new StageExecutionResult(result, indexResult.tokensUsed());
+        } catch (Exception ex) {
+            log.warn("Embedding stage failed for analysisId={}. Proceeding with degraded output.", analysis.getId(), ex);
+            result.put("embeddedFiles", 0);
+            result.put("totalChunks", 0);
+            result.put("skippedFiles", files.size());
+            result.put("status", "DEGRADED");
+            result.put("error", ex.getMessage());
+            result.put("summary", "Embedding stage failed; analysis completed without vector indexing.");
+            return new StageExecutionResult(result, 0);
+        }
     }
 
     private List<String> filterByKeyword(List<FileNode> files, String keyword, int limit) {
@@ -537,7 +535,7 @@ public class AnalysisPipelineService {
 
     private AiEmbeddingResponse executeEmbeddingCall(Analysis analysis, String stageName, String input) {
         String model = "nvidia/nv-embedqa-e5-v5";
-        AiEmbeddingRequest request = new AiEmbeddingRequest(analysis.getAiProvider(), model, input);
+        AiEmbeddingRequest request = new AiEmbeddingRequest(analysis.getAiProvider(), model, input, "passage");
         long started = System.currentTimeMillis();
         try {
             AiEmbeddingResponse response = aiProviderRouter.resolve(analysis.getAiProvider()).embed(request);

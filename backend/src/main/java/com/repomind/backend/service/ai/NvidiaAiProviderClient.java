@@ -1,20 +1,22 @@
 package com.repomind.backend.service.ai;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.repomind.backend.service.ai.dto.*;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.util.retry.Retry;
 
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.TimeoutException;
 
 @Service
 public class NvidiaAiProviderClient implements AiProviderClient {
@@ -49,25 +51,30 @@ public class NvidiaAiProviderClient implements AiProviderClient {
                 Map.of("role", "user", "content", request.userPrompt())
         ));
 
-        JsonNode node = webClient.post()
+        Map<String, Object> response = webClient.post()
                 .uri("/chat/completions")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + apiKey)
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(body)
                 .retrieve()
-                .bodyToMono(JsonNode.class)
+                .bodyToMono(Map.class)
                 .timeout(Duration.ofSeconds(90))
                 .retryWhen(Retry.backoff(3, Duration.ofMillis(400)))
                 .block();
 
-        if (node == null) {
+        if (response == null || response.isEmpty()) {
             throw new IllegalStateException("NVIDIA chat completion returned empty response.");
         }
 
-        String text = node.path("choices").path(0).path("message").path("content").asText("");
-        int inputTokens = node.path("usage").path("prompt_tokens").asInt(0);
-        int outputTokens = node.path("usage").path("completion_tokens").asInt(0);
-        String model = node.path("model").asText(request.model());
+        List<Map<String, Object>> choices = listMap(response.get("choices"));
+        Map<String, Object> firstChoice = choices.isEmpty() ? Collections.emptyMap() : choices.get(0);
+        Map<String, Object> message = map(firstChoice.get("message"));
+        String text = stringValue(message.get("content"), "");
+
+        Map<String, Object> usage = map(response.get("usage"));
+        int inputTokens = intValue(usage.get("prompt_tokens"), 0);
+        int outputTokens = intValue(usage.get("completion_tokens"), 0);
+        String model = stringValue(response.get("model"), request.model());
 
         return new AiGenerationResponse(text, new AiUsage(inputTokens, outputTokens), model);
     }
@@ -75,46 +82,110 @@ public class NvidiaAiProviderClient implements AiProviderClient {
     @Override
     public AiEmbeddingResponse embed(AiEmbeddingRequest request) {
         requireApiKey();
-        Map<String, Object> body = Map.of(
-                "model", request.model(),
-                "input", request.input()
-        );
+        Map<String, Object> body = new HashMap<>();
+        body.put("model", request.model());
+        body.put("input", List.of(request.input()));
+        body.put("encoding_format", "float");
+        if (request.inputType() != null && !request.inputType().isBlank()) {
+            body.put("input_type", request.inputType());
+        }
 
-        JsonNode node = webClient.post()
-                .uri("/embeddings")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + apiKey)
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(body)
-                .retrieve()
-                .bodyToMono(JsonNode.class)
-                .timeout(Duration.ofSeconds(60))
-                .retryWhen(Retry.backoff(3, Duration.ofMillis(300)))
-                .block();
+        Map<String, Object> response;
+        try {
+            response = webClient.post()
+                    .uri("/embeddings")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + apiKey)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .bodyValue(body)
+                    .retrieve()
+                    .bodyToMono(Map.class)
+                    .timeout(Duration.ofSeconds(60))
+                    .retryWhen(Retry.backoff(3, Duration.ofMillis(300))
+                            .filter(this::isRetryableNvidiaError))
+                    .block();
+        } catch (WebClientResponseException ex) {
+            String responseBody = ex.getResponseBodyAsString();
+            throw new IllegalStateException(
+                    "NVIDIA embeddings request failed with HTTP " + ex.getStatusCode().value()
+                            + ". Body: " + (responseBody == null ? "" : responseBody),
+                    ex
+            );
+        }
 
-        if (node == null) {
+        if (response == null || response.isEmpty()) {
             throw new IllegalStateException("NVIDIA embeddings returned empty response.");
         }
 
-        JsonNode vectorNode = node.path("data").path(0).path("embedding");
-        if (!vectorNode.isArray()) {
-            throw new IllegalStateException("NVIDIA embeddings response missing vector array.");
-        }
-
+        List<Map<String, Object>> data = listMap(response.get("data"));
+        Map<String, Object> firstData = data.isEmpty() ? Collections.emptyMap() : data.get(0);
+        List<?> rawVector = list(firstData.get("embedding"));
         List<Double> vector = new ArrayList<>();
-        vectorNode.forEach(value -> vector.add(value.asDouble()));
+        for (Object value : rawVector) {
+            if (value instanceof Number n) {
+                vector.add(n.doubleValue());
+            }
+        }
         if (vector.isEmpty()) {
             throw new IllegalStateException("NVIDIA embeddings response returned empty vector.");
         }
 
-        int inputTokens = node.path("usage").path("prompt_tokens").asInt(0);
-        int outputTokens = node.path("usage").path("completion_tokens").asInt(0);
-        String model = node.path("model").asText(request.model());
+        Map<String, Object> usage = map(response.get("usage"));
+        int inputTokens = intValue(usage.get("prompt_tokens"), 0);
+        int outputTokens = intValue(usage.get("completion_tokens"), 0);
+        String model = stringValue(response.get("model"), request.model());
         return new AiEmbeddingResponse(vector, new AiUsage(inputTokens, outputTokens), model);
+    }
+
+    private boolean isRetryableNvidiaError(Throwable throwable) {
+        if (throwable instanceof TimeoutException) {
+            return true;
+        }
+        if (throwable instanceof WebClientResponseException ex) {
+            return ex.getStatusCode().is5xxServerError();
+        }
+        return true;
     }
 
     private void requireApiKey() {
         if (apiKey == null || apiKey.isBlank()) {
             throw new IllegalStateException("NVIDIA API key is missing. Configure app.ai.nvidia.api-key.");
         }
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> map(Object value) {
+        if (value instanceof Map<?, ?> m) {
+            return (Map<String, Object>) m;
+        }
+        return Collections.emptyMap();
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<Map<String, Object>> listMap(Object value) {
+        if (value instanceof List<?> l) {
+            return (List<Map<String, Object>>) l;
+        }
+        return List.of();
+    }
+
+    private List<?> list(Object value) {
+        if (value instanceof List<?> l) {
+            return l;
+        }
+        return List.of();
+    }
+
+    private int intValue(Object value, int fallback) {
+        if (value instanceof Number n) {
+            return n.intValue();
+        }
+        return fallback;
+    }
+
+    private String stringValue(Object value, String fallback) {
+        if (value instanceof String s && !s.isBlank()) {
+            return s;
+        }
+        return fallback;
     }
 }

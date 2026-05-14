@@ -56,3 +56,13 @@ app:
     nvidia:
       base-url: ${NVIDIA_BASE_URL:https://integrate.api.nvidia.com/v1}
       api-key: ${NVIDIA_API_KEY:}
+  vector:
+    qdrant:
+      base-url: ${QDRANT_BASE_URL:http://qdrant:6333}
+      collection: ${QDRANT_COLLECTION:repomind-embeddings}
+      vector-size: ${QDRANT_VECTOR_SIZE:1024}
+    embed:
+      max-files: ${EMBED_MAX_FILES:450}
+      chunk-size-chars: ${EMBED_CHUNK_SIZE_CHARS:900}
+      chunk-overlap-chars: ${EMBED_CHUNK_OVERLAP_CHARS:120}
+      max-chars-per-file: ${EMBED_MAX_CHARS_PER_FILE:2400}

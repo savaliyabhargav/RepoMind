@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuthStore } from "../../store/authStore";
 import authService from "../../services/authService";
@@ -15,11 +15,17 @@ export default function LoginCallback() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const login = useAuthStore((s) => s.login);
+  const hasProcessedRef = useRef(false);
 
   const [status, setStatus] = useState(STATUS.VERIFYING);
   const [errorMsg, setErrorMsg] = useState("");
 
   useEffect(() => {
+    if (hasProcessedRef.current) {
+      return;
+    }
+    hasProcessedRef.current = true;
+
     const code = searchParams.get("code");
     const returnedState = searchParams.get("state");
     const githubError = searchParams.get("error");
