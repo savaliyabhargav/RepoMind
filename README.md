@@ -166,4 +166,4 @@ RepoMind/
 
 RepoMind is being built with an enterprise mindset from the start: strict schema ownership, deterministic persistence, asynchronous processing for long-running workloads, audited AI interactions, and infrastructure that reflects the actual complexity of repository intelligence rather than hiding it behind toy abstractions.
 
-hellow 
+hhelwejwljel
