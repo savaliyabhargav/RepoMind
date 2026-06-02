@@ -1,4 +1,4 @@
-# RepoMind   the change kaksjdnak
+# RepoMind   the chskdksldjl
 
 RepoMind is an AI-powered repository intelligence platform built to help developers understand unfamiliar codebases without spending days reverse-engineering them by hand. A user submits a GitHub repository, RepoMind ingests the full project structure, stores a normalized model of the codebase, runs a staged AI analysis pipeline, generates searchable semantic embeddings, and exposes the results through a React dashboard with live progress streaming and guided exploration.
 
