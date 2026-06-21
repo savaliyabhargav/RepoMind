@@ -1,0 +1,54 @@
+flowchart LR
+    User["User in Browser"]
+    FE["React Frontend\nLogin / Dashboard / Repo Ingest UI"]
+    BE["Spring Boot Backend\nPort 8080"]
+
+    subgraph AuthFlow["Authentication Flow"]
+        GHLogin["GitHub OAuth Login"]
+        AuthController["AuthController\n/api/auth/github\n/api/auth/refresh"]
+        AuthService["AuthService\nCreates/updates user\nCreates refresh token"]
+        GitHubService["GitHubService\nCalls GitHub user API"]
+        JwtService["JwtService\nCreates RS256 access JWT"]
+        JwtFilter["JwtAuthFilter\nReads Bearer token\nBuilds security context"]
+    end
+
+    subgraph IngestionFlow["Repository Ingestion Flow"]
+        RepoController["RepoController\nPOST /api/repo/ingest"]
+        IngestionService["IngestionService\nValidates URL\nParses owner/repo\nSaves repo + file tree"]
+        GitHubApiClient["GitHubApiClient\nGET /repos/{owner}/{repo}\nGET /git/trees/{branch}?recursive=1"]
+    end
+
+    subgraph Database["PostgreSQL Database"]
+        Users["users\nMain account table\nid UUID primary key"]
+        RefreshTokens["refresh_tokens\nHashed refresh token\nLinked to users.id"]
+        Repos["repos\nIngested repositories\nuser_id -> users.id"]
+        FileNodes["file_nodes\nFiles/folders in repo\nrepo_id -> repos.id"]
+    end
+
+    GitHub["GitHub API"]
+
+    User -->|"Clicks login with GitHub"| FE
+    FE -->|"OAuth code/token sent"| AuthController
+    AuthController --> AuthService
+    AuthService --> GitHubService
+    GitHubService -->|"Fetch GitHub profile"| GitHub
+    AuthService -->|"Insert/find user"| Users
+    AuthService -->|"Store SHA-256 refresh token hash"| RefreshTokens
+    AuthService --> JwtService
+    JwtService -->|"Access token returned"| FE
+    AuthService -->|"Raw refresh token as HttpOnly cookie"| FE
+
+    User -->|"Clicks ingest repo"| FE
+    FE -->|"POST /api/repo/ingest\nAuthorization: Bearer JWT"| BE
+    BE --> JwtFilter
+    JwtFilter -->|"Valid token -> current user UUID"| RepoController
+    RepoController --> IngestionService
+    IngestionService -->|"Find user by userId"| Users
+    IngestionService --> GitHubApiClient
+    GitHubApiClient -->|"Fetch repo metadata"| GitHub
+    GitHubApiClient -->|"Fetch recursive file tree"| GitHub
+    IngestionService -->|"Save Repo with user_id"| Repos
+    IngestionService -->|"Save many FileNode rows with repo_id"| FileNodes
+    IngestionService -->|"Return Repo status READY"| RepoController
+    RepoController -->|"JSON response"| FE
+    FE -->|"Show repo in UI"| User

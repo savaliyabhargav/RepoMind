@@ -15,6 +15,61 @@ This is a code-grounded status from the current workspace at:
 
 ---
 
+## 1.1 Latest Engineering Handoff (2026-05-16)
+
+This section captures the most recent pipeline upgrades completed in this workspace so continuation is unblocked.
+
+### What was upgraded
+- Stage-7 retrieval quality was improved from metadata-heavy matches to code-content-centered matches.
+- End-to-end analysis speed was improved significantly for fast mode (including sub-15-second runs observed for smaller indexing passes).
+- Stage summaries now support heuristic-first output to avoid long remote generation stalls.
+- A deep-pass synthesis stage was integrated into final result assembly with guarded fallback behavior.
+
+### Backend areas updated
+- `backend/src/main/java/com/repomind/backend/service/retrieval/RetrievalService.java`
+- `backend/src/main/java/com/repomind/backend/service/retrieval/QdrantVectorStoreClient.java`
+- `backend/src/main/java/com/repomind/backend/service/retrieval/GitHubContentClient.java` (added)
+- `backend/src/main/java/com/repomind/backend/service/retrieval/LocalCodeEmbeddingService.java` (added)
+- `backend/src/main/java/com/repomind/backend/service/analysis/AnalysisPipelineService.java`
+- `backend/src/main/java/com/repomind/backend/service/ai/NvidiaAiProviderClient.java`
+- `backend/src/main/resources/application.yml`
+
+### Key behavior changes
+- Embeddings now index real file content (not only metadata scaffolding).
+- Re-index path clears prior vectors for the same repo scope before upsert to reduce stale retrieval noise.
+- Retrieval ranking now uses hybrid rerank signals:
+  - semantic score
+  - lexical overlap
+  - query-intent/path boosts
+  - noise penalties
+  - per-file duplicate control
+- Stage summary generation can run in heuristic mode for speed and stability.
+- Deep-pass output is attached into final analysis JSON as `DEEP_PASS`, with graceful fallback text if synthesis call fails.
+
+### Runtime/perf observations from latest runs
+- Earlier slow runs (5 to 20+ minutes) were primarily driven by remote AI retries/timeouts and heavy embedding phases.
+- Fast-mode runs now complete much faster in many cases, with Stage 7 completing in seconds on the shared sample repository.
+- Retrieval relevance materially improved for the query:
+  - `"How does request flow through controllers and services?"`
+  - Top hits shifted to `src/server.cpp`, `include/thread_pool.hpp`, `src/thread_pool.cpp`, `include/task_queue.hpp` (expected for the sample C++ project).
+
+### Remaining known gaps
+- `DEEP_PASS.flowNarrative` / `architectureNarrative` may still fallback when remote synthesis fails.
+- Some data-flow role inference still treats non-web/non-Spring projects as framework analogs; needs stricter language/runtime heuristics.
+- Role summaries for non-core infra files can still be generic under fast mode.
+
+### Recommended next continuation tasks
+1. Make deep-pass synthesis deterministic in fast mode using local summarization + optional remote enrichment.
+2. Tighten data-flow classifier to avoid classifying tests/scripts as controller/service equivalents.
+3. Add adaptive quality profiles:
+   - fast
+   - balanced
+   - deep
+   with explicit token/time budgets and hardware-aware parallel limits.
+4. Add stage-level timings + reason codes into persisted stage metadata for observability.
+
+---
+
 ## 2. Repository Snapshot
 
 ### 2.1 Backend stack

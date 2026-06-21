@@ -58,8 +58,9 @@ public class NvidiaAiProviderClient implements AiProviderClient {
                 .bodyValue(body)
                 .retrieve()
                 .bodyToMono(Map.class)
-                .timeout(Duration.ofSeconds(90))
-                .retryWhen(Retry.backoff(3, Duration.ofMillis(400)))
+                .timeout(Duration.ofSeconds(60))
+                .retryWhen(Retry.backoff(1, Duration.ofMillis(500))
+                        .filter(this::isRetryableNvidiaError))
                 .block();
 
         if (response == null || response.isEmpty()) {
@@ -138,12 +139,12 @@ public class NvidiaAiProviderClient implements AiProviderClient {
 
     private boolean isRetryableNvidiaError(Throwable throwable) {
         if (throwable instanceof TimeoutException) {
-            return true;
+            return false;
         }
         if (throwable instanceof WebClientResponseException ex) {
             return ex.getStatusCode().is5xxServerError();
         }
-        return true;
+        return false;
     }
 
     private void requireApiKey() {

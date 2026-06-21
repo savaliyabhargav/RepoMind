@@ -55,14 +55,18 @@ app:
     provider: ${AI_PROVIDER:NVIDIA_DEV}
     nvidia:
       base-url: ${NVIDIA_BASE_URL:https://integrate.api.nvidia.com/v1}
-      api-key: ${NVIDIA_API_KEY:}
-  vector:
-    qdrant:
-      base-url: ${QDRANT_BASE_URL:http://qdrant:6333}
-      collection: ${QDRANT_COLLECTION:repomind-embeddings}
-      vector-size: ${QDRANT_VECTOR_SIZE:1024}
-    embed:
-      max-files: ${EMBED_MAX_FILES:450}
-      chunk-size-chars: ${EMBED_CHUNK_SIZE_CHARS:900}
-      chunk-overlap-chars: ${EMBED_CHUNK_OVERLAP_CHARS:120}
-      max-chars-per-file: ${EMBED_MAX_CHARS_PER_FILE:2400}
+      api-key: ${NVIDIA_API_KEY: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}
+    gemini:
+      api-key: ${GEMINI_API_KEY:}
+    groq:
+      api-key: ${GROQ_API_KEY:}
+  analysis:
+    max-duration-ms: ${ANALYSIS_MAX_DURATION_MS:120000}
+    quality-profile: ${ANALYSIS_QUALITY_PROFILE:BALANCED}
+    stage-ai-summary-enabled: ${ANALYSIS_STAGE_AI_SUMMARY_ENABLED:false}
+    deep-pass:
+      enabled: ${ANALYSIS_DEEP_PASS_ENABLED:true}
+    annotation:
+      ai-enrichment: ${ANNOTATION_AI_ENRICHMENT:false}
+      ai-max-files: ${ANNOTATION_AI_MAX_FILES:40}
+      ai-max-batches: ${ANNOTATION_AI_MAX_BATCHES:1}

@@ -1,0 +1,116 @@
+flowchart TD
+    %% RepoMind ingestion service only
+    %% Goal: simple English, actual file names, clean request tracking.
+
+    Start["START\nRepoController.java\nController receives POST /api/repo/ingest\nThen calls IngestionService.ingestRepository(url, userId)"]
+
+    subgraph MainService["Main service file: IngestionService.java"]
+        Tx["1. Start one database transaction\nAnnotation: @Transactional\nIf something fails, DB changes can roll back"]
+        ValidateUrl["2. Check GitHub URL format\nUses GITHUB_URL_PATTERN regex\nBad URL stops here"]
+        InvalidUrl["ERROR PATH\nInvalid URL\nThrows IllegalArgumentException"]
+        ParseUrl["3. Extract owner and repo name\nExample URL: github.com/openai/codex\nowner = openai\nrepoName = codex"]
+        LoadUser["4. Load current user\nCalls userRepository.findById(userId)\nThis proves which user owns the repo"]
+        UserMissing["ERROR PATH\nUser UUID not found\nIngestion stops"]
+        FetchInfo["5. Ask for repo metadata\nNeeds name, private flag, default branch, size"]
+        BuildRepo["6. Build Repo object in memory\nstatus = INGESTING\nuser = current User object"]
+        SaveRepo["7. Save Repo first\nNow PostgreSQL creates repo.id UUID\nThis repo.id is needed for file_nodes.repo_id"]
+        FetchTree["8. Ask for full file tree\nUses repo default branch\nFetches files and folders from GitHub"]
+        TreeEmpty["EMPTY TREE PATH\nNo tree returned\nNo FileNode rows are saved"]
+        MapTree["9. Convert GitHub tree entries\nEach GitHub entry becomes one FileNode object"]
+        SaveNodes["10. Save all FileNode rows\nUses fileNodeRepository.saveAll(nodes)\nOne DB row per file/folder"]
+        CountFiles["11. Update file count\nrepo.fileCount = number of file nodes"]
+        MarkReady["12. Mark repo ready\nrepo.status = READY"]
+        SaveReady["13. Save Repo again\nFinal state is stored in repos table"]
+        ReturnRepo["14. Return saved Repo\nController sends it back as JSON"]
+    end
+
+    subgraph RepositoryFiles["Spring Data repository files"]
+        UserRepositoryFile["UserRepository.java\nReads users table by UUID"]
+        RepoRepositoryFirstSave["RepoRepository.java\nFirst save of Repo\nCreates repo row and repo.id UUID"]
+        RepoRepositoryReadySave["RepoRepository.java\nSecond save of Repo\nStores status READY and fileCount"]
+        FileNodeRepositoryFile["FileNodeRepository.java\nSaves FileNode list\nAlso used later by analysis pipeline"]
+    end
+
+    subgraph EntityFiles["Entity files mapped to PostgreSQL tables"]
+        UserTable["users table\nFound by users.id UUID\nThis is the current logged-in user"]
+        RepoEntity["Repo.java\nJava entity for repos table\nContains user, url, owner, name, status, defaultBranch, fileCount"]
+        ReposTableFirstSave["repos table\nFirst saved row\nstatus = INGESTING\nrepos.user_id points to users.id"]
+        ReposTableReadySave["repos table\nFinal saved row\nstatus = READY\nfile_count is updated"]
+        FileNodeEntity["FileNode.java\nJava entity for file_nodes table\nContains repo, path, name, type, depth, sizeBytes, isInScope"]
+        FileNodesTable["file_nodes table\nStores many rows\nfile_nodes.repo_id points to repos.id"]
+    end
+
+    subgraph GithubClientFiles["GitHub API client and DTO files"]
+        GitHubApiClientRepoInfo["GitHubApiClient.java\nMethod: getRepoInfo(owner, repo)\nUses WebClient to call GitHub"]
+        GitHubApiClientTree["GitHubApiClient.java\nMethod: getTree(owner, repo, branch)\nUses WebClient to call GitHub"]
+        RepoApi["GitHub endpoint\nGET /repos/{owner}/{repo}"]
+        GitHubRepoResponseFile["GitHubRepoResponse.java\nDTO for repo metadata JSON\nMaps private and default_branch with @JsonProperty"]
+        TreeApi["GitHub endpoint\nGET /repos/{owner}/{repo}/git/trees/{branch}?recursive=1"]
+        GitHubTreeResponseFile["GitHubTreeResponse.java\nDTO for full tree response\nContains List<GitHubTreeEntry> tree"]
+        GitHubTreeEntryFile["GitHubTreeEntry.java\nDTO for one file/folder entry\npath, type, sha, size"]
+    end
+
+    subgraph FileNodeMapping["How one GitHubTreeEntry becomes one FileNode"]
+        EntryPath["entry.path\nExample: src/main/App.java"]
+        NameRule["name = last part of path\nApp.java"]
+        DepthRule["depth = count '/' in path\nsrc/main/App.java has depth 2"]
+        TypeRule["type rule\nGitHub blob becomes FILE\nanything else becomes DIRECTORY"]
+        SizeRule["sizeBytes rule\nUse entry.size\nIf size is null, use 0"]
+        ScopeRule["scope rule\nisInScope = true\nMeans analysis can use it later"]
+    end
+
+    End["END\nRepoController.java returns JSON to frontend\nFrontend can show repo status READY"]
+
+    Start --> Tx
+    Tx --> ValidateUrl
+    ValidateUrl -->|"URL is invalid"| InvalidUrl
+    ValidateUrl -->|"URL is valid"| ParseUrl
+    ParseUrl --> LoadUser
+
+    LoadUser --> UserRepositoryFile
+    UserRepositoryFile --> UserTable
+    UserTable -->|"user not found"| UserMissing
+    UserTable -->|"user found"| FetchInfo
+
+    FetchInfo --> GitHubApiClientRepoInfo
+    GitHubApiClientRepoInfo --> RepoApi
+    RepoApi --> GitHubRepoResponseFile
+    GitHubRepoResponseFile --> BuildRepo
+
+    BuildRepo --> RepoEntity
+    RepoEntity --> SaveRepo
+    SaveRepo --> RepoRepositoryFirstSave
+    RepoRepositoryFirstSave --> ReposTableFirstSave
+    ReposTableFirstSave -->|"repo.id UUID is now available"| FetchTree
+
+    FetchTree --> GitHubApiClientTree
+    GitHubApiClientTree --> TreeApi
+    TreeApi --> GitHubTreeResponseFile
+    GitHubTreeResponseFile -->|"tree is null"| TreeEmpty
+    GitHubTreeResponseFile -->|"tree has entries"| GitHubTreeEntryFile
+    GitHubTreeEntryFile --> MapTree
+
+    MapTree --> EntryPath
+    EntryPath --> NameRule
+    EntryPath --> DepthRule
+    EntryPath --> TypeRule
+    EntryPath --> SizeRule
+    EntryPath --> ScopeRule
+
+    NameRule --> FileNodeEntity
+    DepthRule --> FileNodeEntity
+    TypeRule --> FileNodeEntity
+    SizeRule --> FileNodeEntity
+    ScopeRule --> FileNodeEntity
+
+    FileNodeEntity --> SaveNodes
+    SaveNodes --> FileNodeRepositoryFile
+    FileNodeRepositoryFile --> FileNodesTable
+    FileNodesTable --> CountFiles
+    CountFiles --> MarkReady
+    TreeEmpty --> MarkReady
+    MarkReady --> SaveReady
+    SaveReady --> RepoRepositoryReadySave
+    RepoRepositoryReadySave --> ReposTableReadySave
+    ReposTableReadySave --> ReturnRepo
+    ReturnRepo --> End
