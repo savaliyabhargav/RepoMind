@@ -60,7 +60,7 @@ export default function OverviewScreen() {
       const data = await repoService.ingestRepo(repoUrl.trim(), user.id);
       setRepoData(data);
       setIngest(INGEST.SUCCESS);
-      setTimeout(() => navigate(`/analyze/repo/${data.id}`), 1200);
+      setTimeout(() => navigate(`/analyze/repo/${data.repoId}`), 300);
     } catch (err) {
       console.error("[OverviewScreen] Ingest failed:", err);
       setErrorMsg(err.response?.data?.message || "Failed to ingest repository. Please try again.");
@@ -208,10 +208,9 @@ export default function OverviewScreen() {
             {ingest === INGEST.SUCCESS && repoData && (
               <div className="overview-result-card">
                 {[
-                  ["Repository", `${repoData.owner}/${repoData.name}`],
-                  ["Files indexed", `${repoData.fileCount}`],
-                  ["Size", `${repoData.sizeKb} KB`],
+                  ["Repo ID", repoData.repoId],
                   ["Status", repoData.status],
+                  ["Message", repoData.message],
                 ].map(([label, value]) => (
                   <div key={label} className="overview-result-row">
                     <span>{label}</span>

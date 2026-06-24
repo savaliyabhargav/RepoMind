@@ -42,7 +42,7 @@ mermaid.initialize({
   },
 });
 
-const LOAD = { LOADING: "loading", SUCCESS: "success", ERROR: "error" };
+const LOAD = { LOADING: "loading", PROCESSING: "processing", SUCCESS: "success", ERROR: "error" };
 
 const DOCK_ITEMS = [
   { id: "files", label: "Files", symbol: "F" },
@@ -401,22 +401,55 @@ export default function RepoDetailScreen() {
 
   useEffect(() => {
     let mounted = true;
+    let pollTimer = null;
+
+    function applyTree(treeResponse) {
+      const treeData = treeResponse?.nodes ?? treeResponse ?? [];
+      setNodes(treeData);
+      setExpandedFolders(new Set(collectFolderPaths(buildFileTree(treeData))));
+      setStatus(LOAD.SUCCESS);
+    }
+
+    function pollUntilReady() {
+      pollTimer = setTimeout(async () => {
+        if (!mounted) return;
+        try {
+          const treeResponse = await repoService.getRepoTree(repoId);
+          if (!mounted) return;
+          if (treeResponse?.source === "pending") {
+            pollUntilReady();
+          } else {
+            applyTree(treeResponse);
+          }
+        } catch {
+          if (mounted) pollUntilReady();
+        }
+      }, 1500);
+    }
+
     async function load() {
       setStatus(LOAD.LOADING); setError("");
       try {
-        const [, treeData] = await Promise.all([repoService.getRepo(repoId), repoService.getRepoTree(repoId)]);
+        const [, treeResponse] = await Promise.all([repoService.getRepo(repoId), repoService.getRepoTree(repoId)]);
         if (!mounted) return;
-        setNodes(treeData);
-        setExpandedFolders(new Set(collectFolderPaths(buildFileTree(treeData))));
-        setStatus(LOAD.SUCCESS);
+        if (treeResponse?.source === "pending") {
+          setStatus(LOAD.PROCESSING);
+          pollUntilReady();
+        } else {
+          applyTree(treeResponse);
+        }
       } catch (err) {
         if (!mounted) return;
         setError(err.response?.data?.message || "Unable to load repository workspace.");
         setStatus(LOAD.ERROR);
       }
     }
+
     load();
-    return () => { mounted = false; };
+    return () => {
+      mounted = false;
+      clearTimeout(pollTimer);
+    };
   }, [repoId]);
 
   useEffect(() => {
@@ -488,6 +521,9 @@ export default function RepoDetailScreen() {
     <div className="workspace-root">
       {status === LOAD.LOADING && (
         <main className="workspace-state"><span className="workspace-loader" /><p>Opening workspace...</p></main>
+      )}
+      {status === LOAD.PROCESSING && (
+        <main className="workspace-state"><span className="workspace-loader" /><p>Fetching repository from GitHub, this takes a few seconds...</p></main>
       )}
       {status === LOAD.ERROR && (
         <main className="workspace-state is-error"><p>{error}</p><Link to="/analyze">Return to scan screen</Link></main>
