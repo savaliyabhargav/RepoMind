@@ -2,6 +2,10 @@ server:
   port: 8080
   servlet:
     context-path: /api
+  tomcat:
+    threads:
+      max: 20        # default is 200 — wastes ~180MB RAM on your 8GB machine
+      min-spare: 5   # keep 5 warm, spin up more only if needed
 
 spring:
   application:
@@ -12,6 +16,11 @@ spring:
     username: ${DB_USERNAME:repomind}
     password: ${DB_PASSWORD:repomind123}
     driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 10  # 3 workers + 1 scheduler + 5 HTTP threads peak = ~9 max
+      minimum-idle: 2        # keep 2 connections warm, release the rest
+      idle-timeout: 30000
+      connection-timeout: 20000
 
   jpa:
     hibernate:
@@ -51,8 +60,14 @@ spring:
       properties:
         spring.json.trusted.packages: "com.repomind.backend.*"
         spring.json.use.type.headers: true
+        fetch.max.wait.ms: 100   # default 500ms — reduces worker pickup delay from ~400ms to ~100ms
     listener:
       ack-mode: manual
+
+  task:
+    scheduling:
+      pool:
+        size: 2  # 1 for flushBuffer @Scheduled + 1 spare; default is 1
 
   security:
     oauth2:
