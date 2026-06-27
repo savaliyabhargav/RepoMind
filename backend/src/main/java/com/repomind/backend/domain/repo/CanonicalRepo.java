@@ -1,37 +1,31 @@
 package com.repomind.backend.domain.repo;
 
-import com.repomind.backend.domain.user.User;
 import jakarta.persistence.*;
 import lombok.*;
-import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.Instant;
 import java.util.UUID;
 
 @Entity
-@Table(name = "repos")
+@Table(name = "canonical_repos")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class Repo {
+public class CanonicalRepo {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false)
-    private User user;
-
     @Column(nullable = false)
-    private String url;
-
-    private String name;
-
     private String owner;
 
+    @Column(name = "repo_name", nullable = false)
+    private String repoName;
+
+    @Column(nullable = false)
     private String provider;
 
     @Column(name = "is_private")
@@ -47,16 +41,8 @@ public class Repo {
     private Long sizeKb;
 
     @Column(nullable = false)
-    private String status; // PENDING, INGESTING, READY, FAILED
+    private String status; // FETCHING, READY
 
-    @Column(name = "error_msg")
-    private String errorMsg;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "canonical_repo_id")
-    private CanonicalRepo canonicalRepo;
-
-    @CreationTimestamp
-    @Column(name = "created_at", updatable = false)
-    private Instant createdAt;
+    @Column(name = "last_fetched_at")
+    private Instant lastFetchedAt;
 }

@@ -3,14 +3,11 @@ package com.repomind.backend.domain.repo;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 @Repository
-public interface RepoRepository extends JpaRepository<Repo, UUID> {
+public interface CanonicalRepoRepository extends JpaRepository<CanonicalRepo, UUID> {
 
-    Optional<Repo> findByUrlAndUserId(String url, UUID userId);
-
-    List<Repo> findByUserIdOrderByCreatedAtDesc(UUID userId);
+    Optional<CanonicalRepo> findByOwnerAndRepoNameAndProvider(String owner, String repoName, String provider);
 }

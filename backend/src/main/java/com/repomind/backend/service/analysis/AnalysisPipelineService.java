@@ -143,7 +143,11 @@ public class AnalysisPipelineService {
         analysis = analysisRepository.save(analysis);
 
         List<AnalysisStage> stages = createStages(analysis);
-        List<FileNode> repoNodes = fileNodeRepository.findByRepoIdOrderByPathAsc(repoId);
+        var canonical = repo.getCanonicalRepo();
+        if (canonical == null) {
+            throw new IllegalArgumentException("Repository " + repoId + " has no ingested file tree — re-ingest required");
+        }
+        List<FileNode> repoNodes = fileNodeRepository.findByCanonicalRepoIdOrderByPathAsc(canonical.getId());
         List<FileNode> repoFiles = repoNodes.stream()
                 .filter(node -> "FILE".equalsIgnoreCase(node.getType()))
                 .toList();

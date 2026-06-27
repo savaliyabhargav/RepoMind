@@ -8,10 +8,12 @@ import com.repomind.backend.domain.repo.Repo;
 import com.repomind.backend.domain.repo.RepoRepository;
 import com.repomind.backend.domain.user.User;
 import com.repomind.backend.domain.user.UserRepository;
+import com.repomind.backend.service.ingestion.GitHubUrlParser;
 import com.repomind.backend.service.ingestion.kafka.FileNodeMessage;
 import com.repomind.backend.service.ingestion.kafka.RepoIngestionProducer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -20,8 +22,6 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 @RestController
 @RequestMapping("/repo")
@@ -36,9 +36,6 @@ public class RepoController {
     private final RedisTemplate<String, String> redisTemplate;
     private final ObjectMapper objectMapper;
 
-    private static final Pattern GITHUB_URL_PATTERN =
-            Pattern.compile("github\\.com/([^/]+)/([^/.]+)(?:\\.git)?");
-
     @PostMapping("/ingest")
     public ResponseEntity<?> ingest(@RequestBody Map<String, String> request) {
         String url = request.get("url");
@@ -49,23 +46,31 @@ public class RepoController {
                     .body("Missing 'url' or 'userId' in request body");
         }
 
+        if (!GitHubUrlParser.isValid(url)) {
+            return ResponseEntity.badRequest().body("Invalid GitHub URL");
+        }
+
         UUID userId = UUID.fromString(userIdStr);
         User user = userRepository.findById(userId).orElse(null);
         if (user == null) {
             return ResponseEntity.badRequest().body("User not found");
         }
 
-        // Extract owner and name from URL immediately — no GitHub call needed
-        // e.g. "github.com/savaliyabhargav/RepoMind" → owner="savaliyabhargav", name="RepoMind"
-        Matcher matcher = GITHUB_URL_PATTERN.matcher(url);
-        if (!matcher.find()) {
-            return ResponseEntity.badRequest().body("Invalid GitHub URL");
+        // Return existing repo if this URL was already ingested by this user
+        var existing = repoRepository.findByUrlAndUserId(url, userId);
+        if (existing.isPresent()) {
+            Repo repo = existing.get();
+            log.info("Duplicate ingest request for url={} userId={} — returning existing repoId={}", url, userId, repo.getId());
+            return ResponseEntity.ok(Map.of(
+                    "repoId", repo.getId(),
+                    "status", repo.getStatus(),
+                    "message", "Repository already ingested"
+            ));
         }
-        String owner = matcher.group(1);
-        String name = matcher.group(2);
 
-        // Create repo row immediately with PENDING status
-        // name and owner come from URL parsing — GitHub will fill in the rest later
+        String owner = GitHubUrlParser.extractOwner(url);
+        String name = GitHubUrlParser.extractRepoName(url);
+
         Repo repo = Repo.builder()
                 .user(user)
                 .url(url)
@@ -74,17 +79,39 @@ public class RepoController {
                 .provider("GITHUB")
                 .status("PENDING")
                 .build();
-        repo = repoRepository.save(repo);
+        try {
+            repo = repoRepository.save(repo);
+        } catch (DataIntegrityViolationException ex) {
+            // Race condition: two concurrent requests slipped past the findByUrlAndUserId check
+            // The unique constraint on (user_id, url) caught it — return the existing row
+            Repo raceWinner = repoRepository.findByUrlAndUserId(url, userId)
+                    .orElseThrow(() -> new IllegalStateException("Constraint violated but repo not found"));
+            return ResponseEntity.ok(Map.of(
+                    "repoId", raceWinner.getId(),
+                    "status", raceWinner.getStatus(),
+                    "message", "Repository already ingested"
+            ));
+        }
 
-        // Write to Kafka — takes ~5ms, then this thread is completely free
         repoIngestionProducer.submitIngestion(repo.getId(), url, userId);
 
-        // Return IMMEDIATELY — user does not wait for GitHub or DB writes
         return ResponseEntity.accepted().body(Map.of(
                 "repoId", repo.getId(),
                 "status", "PENDING",
                 "message", "Repository ingestion started"
         ));
+    }
+
+    @GetMapping
+    public ResponseEntity<?> listRepos(@RequestParam UUID userId) {
+        if (!userRepository.existsById(userId)) {
+            return ResponseEntity.badRequest().body("User not found");
+        }
+        List<RepoResponse> repos = repoRepository.findByUserIdOrderByCreatedAtDesc(userId)
+                .stream()
+                .map(RepoResponse::from)
+                .toList();
+        return ResponseEntity.ok(repos);
     }
 
     @GetMapping("/{repoId}")
@@ -96,12 +123,12 @@ public class RepoController {
 
     @GetMapping("/{repoId}/tree")
     public ResponseEntity<?> getRepoTree(@PathVariable UUID repoId) {
-        if (!repoRepository.existsById(repoId)) {
+        Repo repo = repoRepository.findById(repoId).orElse(null);
+        if (repo == null) {
             return ResponseEntity.notFound().build();
         }
 
-        // Step 1 — check Redis first (~1ms)
-        // If the worker just finished fetching from GitHub, tree is here already
+        // Check Redis first (~1ms) — worker caches tree here immediately after GitHub fetch
         String redisKey = "repo:tree:" + repoId;
         String cached = redisTemplate.opsForValue().get(redisKey);
 
@@ -119,19 +146,28 @@ public class RepoController {
             }
         }
 
-        // Step 2 — check DB (batch writer has already flushed by now)
-        List<FileNode> dbNodes = fileNodeRepository.findByRepoIdOrderByPathAsc(repoId);
+        // No Redis — check if ingestion has linked a canonical yet
+        var canonical = repo.getCanonicalRepo();
+        if (canonical == null) {
+            return ResponseEntity.accepted().body(Map.of(
+                    "source", "pending",
+                    "status", "INGESTING",
+                    "message", "Repository is being ingested, retry shortly"
+            ));
+        }
+
+        // Serve shared file tree from DB via canonical
+        List<FileNode> dbNodes = fileNodeRepository.findByCanonicalRepoIdOrderByPathAsc(canonical.getId());
         if (!dbNodes.isEmpty()) {
-            log.info("Tree served from DB for repoId={} nodes={}", repoId, dbNodes.size());
+            log.info("Tree served from DB for repoId={} canonicalId={} nodes={}",
+                    repoId, canonical.getId(), dbNodes.size());
             return ResponseEntity.ok(Map.of(
                     "source", "database",
                     "nodes", dbNodes.stream().map(FileNodeResponse::from).toList()
             ));
         }
 
-        // Step 3 — both Redis and DB are empty
-        // This is the rare 2-second window between Redis deletion and DB write
-        // Tell the frontend to retry shortly
+        // Rare 2-second window: canonical exists but batch writer hasn't flushed yet
         return ResponseEntity.accepted().body(Map.of(
                 "source", "pending",
                 "status", "PROCESSING",

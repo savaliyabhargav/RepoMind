@@ -29,6 +29,9 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
+        jdbc:
+          batch_size: 500        # group inserts into batches of 500 instead of 1 per row
+        order_inserts: true      # sort inserts by entity type so batches don't break mid-flight
 
   flyway:
     enabled: true

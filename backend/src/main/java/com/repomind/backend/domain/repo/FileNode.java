@@ -19,8 +19,8 @@ public class FileNode {
     private UUID id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "repo_id", nullable = false)
-    private Repo repo;
+    @JoinColumn(name = "canonical_repo_id", nullable = false)
+    private CanonicalRepo canonicalRepo;
 
     @Column(nullable = false, columnDefinition = "TEXT")
     private String path;

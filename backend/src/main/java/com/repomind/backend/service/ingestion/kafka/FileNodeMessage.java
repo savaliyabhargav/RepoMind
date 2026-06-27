@@ -2,10 +2,11 @@ package com.repomind.backend.service.ingestion.kafka;
 
 import java.util.UUID;
 
-// This is what the IngestionWorker publishes after getting the tree from GitHub.
-// The FileNodeBatchWriter reads these and bulk-inserts them into the DB every 2 seconds.
+// canonicalRepoId — points to the shared canonical_repos row (used for DB write)
+// userRepoId     — the requesting user's repos row (used for Redis cache invalidation)
 public record FileNodeMessage(
-        UUID repoId,
+        UUID canonicalRepoId,
+        UUID userRepoId,
         String path,
         String name,
         String type,

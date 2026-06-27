@@ -1,8 +1,9 @@
 package com.repomind.backend.service.ingestion.kafka;
 
+import com.repomind.backend.domain.repo.CanonicalRepo;
+import com.repomind.backend.domain.repo.CanonicalRepoRepository;
 import com.repomind.backend.domain.repo.FileNode;
 import com.repomind.backend.domain.repo.FileNodeRepository;
-import com.repomind.backend.domain.repo.RepoRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -24,15 +25,17 @@ import java.util.stream.Collectors;
 public class FileNodeBatchWriter {
 
     private final FileNodeRepository fileNodeRepository;
-    private final RepoRepository repoRepository;
+    private final CanonicalRepoRepository canonicalRepoRepository;
     private final RedisTemplate<String, String> redisTemplate;
 
-    // ConcurrentLinkedQueue is thread-safe — multiple Kafka listener threads
-    // can add to it simultaneously without corrupting data
-    private final ConcurrentLinkedQueue<FileNode> buffer = new ConcurrentLinkedQueue<>();
+    // Max nodes drained per flush cycle — keeps each DB transaction under ~300ms
+    // even for huge repos. Remaining nodes stay in the buffer for the next cycle (2s later).
+    private static final int FLUSH_BATCH_SIZE = 1000;
 
-    // Step 1 — Kafka listener adds incoming file nodes to the in-memory buffer
-    // Does NOT write to DB here — just collects them
+    private record PendingNode(FileNode node, UUID userRepoId, Acknowledgment ack) {}
+
+    private final ConcurrentLinkedQueue<PendingNode> buffer = new ConcurrentLinkedQueue<>();
+
     @KafkaListener(
             topics = "repo-filenodes-raw",
             groupId = "filenode-writers",
@@ -40,9 +43,10 @@ public class FileNodeBatchWriter {
     )
     public void receiveFileNode(FileNodeMessage message, Acknowledgment ack) {
         // getReferenceById returns a JPA proxy — no DB hit, just sets the FK
-        // This is the correct way to set a parent reference without loading it
+        CanonicalRepo canonicalRef = canonicalRepoRepository.getReferenceById(message.canonicalRepoId());
+
         FileNode node = FileNode.builder()
-                .repo(repoRepository.getReferenceById(message.repoId()))
+                .canonicalRepo(canonicalRef)
                 .path(message.path())
                 .name(message.name())
                 .type(message.type())
@@ -51,43 +55,40 @@ public class FileNodeBatchWriter {
                 .isInScope(true)
                 .build();
 
-        buffer.add(node);
-        // Acknowledge immediately — we have the data in memory, that is enough
-        // If server crashes here, the worst case is re-processing on restart
-        ack.acknowledge();
+        // Ack is deferred until after flushBuffer() confirms the DB write succeeds
+        buffer.add(new PendingNode(node, message.userRepoId(), ack));
     }
 
-    // Step 2 — Every 2 seconds, drain the buffer and do ONE bulk insert to DB
-    // This runs on a separate scheduler thread, not the Kafka listener thread
     @Scheduled(fixedDelay = 2000)
     public void flushBuffer() {
         if (buffer.isEmpty()) return;
 
-        // Drain all items currently in buffer into a local list
-        // New items arriving during this drain will go into the next flush
-        List<FileNode> toWrite = new ArrayList<>();
-        FileNode node;
-        while ((node = buffer.poll()) != null) {
-            toWrite.add(node);
+        List<PendingNode> pending = new ArrayList<>(FLUSH_BATCH_SIZE);
+        PendingNode item;
+        int drained = 0;
+        while (drained < FLUSH_BATCH_SIZE && (item = buffer.poll()) != null) {
+            pending.add(item);
+            drained++;
         }
 
-        if (toWrite.isEmpty()) return;
+        if (pending.isEmpty()) return;
 
-        log.info("Batch writing {} file nodes to DB", toWrite.size());
+        List<FileNode> nodes = pending.stream().map(PendingNode::node).toList();
+        log.info("Batch writing {} file nodes to DB", nodes.size());
 
-        // ONE bulk INSERT for everything collected in the last 2 seconds
-        // Much faster than N individual inserts
-        fileNodeRepository.saveAll(toWrite);
+        fileNodeRepository.saveAll(nodes);
 
-        // After DB write is confirmed, delete the Redis cache for these repos
-        // From now on the tree endpoint will read from DB, not Redis
-        Set<UUID> writtenRepoIds = toWrite.stream()
-                .map(n -> n.getRepo().getId())
+        // Ack only after confirmed DB write — Kafka redelivers if saveAll() throws
+        pending.forEach(p -> p.ack().acknowledge());
+
+        // Clear Redis caches for the user repos whose file nodes are now in DB
+        Set<UUID> userRepoIds = pending.stream()
+                .map(PendingNode::userRepoId)
                 .collect(Collectors.toSet());
 
-        writtenRepoIds.forEach(repoId -> {
+        userRepoIds.forEach(repoId -> {
             redisTemplate.delete("repo:tree:" + repoId);
-            log.info("Cleared Redis cache for repoId={} (now in DB)", repoId);
+            log.info("Cleared Redis cache for repoId={} (file nodes now in DB)", repoId);
         });
     }
 }
