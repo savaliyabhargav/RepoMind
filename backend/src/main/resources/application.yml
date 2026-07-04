@@ -64,6 +64,10 @@ spring:
         spring.json.trusted.packages: "com.repomind.backend.*"
         spring.json.use.type.headers: true
         fetch.max.wait.ms: 100   # default 500ms — reduces worker pickup delay from ~400ms to ~100ms
+        # Ingestion workers legitimately sleep between GitHub retries (rate limit +
+        # transient backoff). Default 5min would evict the consumer mid-sleep and
+        # redeliver the message — the cause of duplicate ingestion runs.
+        max.poll.interval.ms: 600000
     listener:
       ack-mode: manual
 
@@ -77,8 +81,10 @@ spring:
       client:
         registration:
           github:
-            client-id: ${GITHUB_CLIENT_ID:Ov23liMS3rS8EhkfkIY5}
-            client-secret: ${GITHUB_CLIENT_SECRET:c8dae2a171b556d4ce502300842664b6eb3b1840}
+            # Values come from the environment (.env via docker-compose) — never
+            # commit real credentials as defaults in this file.
+            client-id: ${GITHUB_CLIENT_ID:}
+            client-secret: ${GITHUB_CLIENT_SECRET:}
             scope: read:user,user:email
 
 management:
@@ -89,15 +95,21 @@ management:
         include: health,info
 
 app:
+  github:
+    # Personal access token for the GitHub REST API (repo metadata + tree fetch).
+    # Without it GitHub allows only 60 requests/hour per IP — ingestion becomes
+    # flaky as soon as a few repos are submitted. With a token: 5000/hour.
+    token: ${GITHUB_TOKEN:}
   ai:
     provider: ${AI_PROVIDER:NVIDIA_DEV}
     nvidia:
       base-url: ${NVIDIA_BASE_URL:https://integrate.api.nvidia.com/v1}
-      api-key: ${NVIDIA_API_KEY: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}
+      api-key: ${NVIDIA_API_KEY:}
     gemini:
       api-key: ${GEMINI_API_KEY:}
     groq:
-      api-key: ${GROQ_API_KEY:}
+      # Comma-separated list for key rotation; falls back to the single-key var.
+      api-keys: ${GROQ_API_KEYS:${GROQ_API_KEY:}}
   analysis:
     max-duration-ms: ${ANALYSIS_MAX_DURATION_MS:120000}
     quality-profile: ${ANALYSIS_QUALITY_PROFILE:BALANCED}

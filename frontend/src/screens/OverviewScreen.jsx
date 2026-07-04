@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "../store/authStore";
 import authService from "../services/authService";
@@ -21,6 +21,13 @@ function isValidGithubUrl(url) {
   }
 }
 
+function statusTone(status) {
+  const s = (status || "").toUpperCase();
+  if (["FAILED", "ERROR"].includes(s)) return "red";
+  if (["PENDING", "PROCESSING", "INGESTING", "RUNNING"].includes(s)) return "amber";
+  return "green";
+}
+
 export default function OverviewScreen() {
   const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
@@ -28,15 +35,31 @@ export default function OverviewScreen() {
   const [repoUrl, setRepoUrl] = useState("");
   const [ingest, setIngest] = useState(INGEST.IDLE);
   const [errorMsg, setErrorMsg] = useState("");
-  const [repoData, setRepoData] = useState(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [navOpen, setNavOpen] = useState(false);
 
-  const joinedDate = user?.createdAt
-    ? new Date(user.createdAt).toLocaleDateString("en-GB", {
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-      })
-    : "-";
+  const [history, setHistory] = useState([]);
+  const [historyState, setHistoryState] = useState("loading"); // loading | ready | error
+
+  useEffect(() => {
+    if (!user?.id) return;
+    let active = true;
+    (async () => {
+      try {
+        const repos = await repoService.listRepos(user.id);
+        if (active) {
+          setHistory(Array.isArray(repos) ? repos : []);
+          setHistoryState("ready");
+        }
+      } catch (err) {
+        console.error("[OverviewScreen] Failed to load history:", err);
+        if (active) setHistoryState("error");
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [user?.id]);
 
   const handleLogout = useCallback(async () => {
     await authService.logoutApi();
@@ -47,18 +70,16 @@ export default function OverviewScreen() {
     if (!repoUrl.trim()) return;
 
     if (!isValidGithubUrl(repoUrl.trim())) {
-      setErrorMsg("Enter a valid GitHub URL - e.g. https://github.com/owner/repo");
+      setErrorMsg("Enter a valid GitHub URL — e.g. https://github.com/owner/repo");
       setIngest(INGEST.ERROR);
       return;
     }
 
     setIngest(INGEST.LOADING);
     setErrorMsg("");
-    setRepoData(null);
 
     try {
       const data = await repoService.ingestRepo(repoUrl.trim(), user.id);
-      setRepoData(data);
       setIngest(INGEST.SUCCESS);
       setTimeout(() => navigate(`/analyze/repo/${data.repoId}`), 300);
     } catch (err) {
@@ -68,221 +89,178 @@ export default function OverviewScreen() {
     }
   }, [repoUrl, user, navigate]);
 
+  const resetComposer = useCallback(() => {
+    setRepoUrl("");
+    setIngest(INGEST.IDLE);
+    setErrorMsg("");
+    setNavOpen(false);
+  }, []);
+
+  const busy = ingest === INGEST.LOADING || ingest === INGEST.SUCCESS;
+
   return (
-    <div className="overview-root">
-      <div className="overview-backdrop" aria-hidden="true" />
-      <div className="overview-grid" aria-hidden="true" />
+    <div className="home">
+      {navOpen && <div className="home-scrim" onClick={() => setNavOpen(false)} aria-hidden="true" />}
 
-      <aside className="overview-sidebar">
-        <div className="overview-sidebar-brand">
-          <div className="overview-sidebar-mark">RM</div>
-          <div>
-            <strong>RepoMind</strong>
-            <span>Mission workspace</span>
+      {/* ── Sidebar ──────────────────────────────────────────── */}
+      <aside className={`home-sidebar ${navOpen ? "open" : ""}`}>
+        <div className="home-side-top">
+          <div className="home-brand">
+            <span className="home-brand-mark">RM</span>
+            RepoMind
           </div>
+          <button className="home-new" onClick={resetComposer}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+              <line x1="12" y1="5" x2="12" y2="19" strokeLinecap="round" />
+              <line x1="5" y1="12" x2="19" y2="12" strokeLinecap="round" />
+            </svg>
+            New analysis
+          </button>
         </div>
 
-        <div className="overview-sidebar-section">
-          <p className="overview-section-label">Operator</p>
-          <div className="overview-profile-card">
+        <div className="home-history">
+          <p className="home-history-label">Recents</p>
+
+          {historyState === "loading" && (
+            <div className="home-history-skeleton">
+              {[0, 1, 2, 3].map((i) => (
+                <span key={i} />
+              ))}
+            </div>
+          )}
+
+          {historyState === "error" && (
+            <p className="home-history-empty">Could not load history.</p>
+          )}
+
+          {historyState === "ready" && history.length === 0 && (
+            <p className="home-history-empty">No repositories yet. Analyze one to get started.</p>
+          )}
+
+          {historyState === "ready" && history.length > 0 && (
+            <div className="home-history-list">
+              {history.map((repo) => (
+                <button
+                  key={repo.id}
+                  className="home-repo"
+                  title={repo.url}
+                  onClick={() => navigate(`/analyze/repo/${repo.id}`)}
+                >
+                  <span className={`home-repo-dot ${statusTone(repo.status)}`} />
+                  <span className="home-repo-text">
+                    <span className="home-repo-name">{repo.name}</span>
+                    <span className="home-repo-owner">{repo.owner}</span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="home-side-foot">
+          <button className="home-account" onClick={() => setMenuOpen((v) => !v)}>
             {user?.avatarUrl ? (
-              <img src={user.avatarUrl} alt={`${user.username} avatar`} className="overview-avatar" />
+              <img src={user.avatarUrl} alt="" className="home-avatar" />
             ) : (
-              <div className="overview-avatar overview-avatar-fallback">
+              <span className="home-avatar home-avatar-fallback">
                 {user?.username?.[0]?.toUpperCase() ?? "?"}
-              </div>
+              </span>
             )}
-            <strong>{user?.username ?? "-"}</strong>
-            {user?.email && <span>{user.email}</span>}
-          </div>
-        </div>
+            <span className="home-account-name">{user?.username ?? "Account"}</span>
+            <svg className="home-account-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+              <polyline points="6 9 12 15 18 9" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
 
-        <div className="overview-sidebar-section">
-          <p className="overview-section-label">Workspace facts</p>
-          <div className="overview-sidebar-list">
-            {[
-              ["Plan", user?.plan ?? "FREE"],
-              ["Joined", joinedDate],
-              ["Provider", "GITHUB"],
-              ["Status", "ACTIVE"],
-            ].map(([label, value]) => (
-              <div key={label} className="overview-sidebar-item">
-                <span>{label}</span>
-                <strong>{value}</strong>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="overview-sidebar-section">
-          <p className="overview-section-label">Stack</p>
-          <div className="overview-chip-list">
-            {["React 19", "Spring Boot", "PostgreSQL", "Redis", "Kafka", "Qdrant"].map((item) => (
-              <span key={item}>{item}</span>
-            ))}
-          </div>
+          {menuOpen && (
+            <div className="home-menu" onMouseLeave={() => setMenuOpen(false)}>
+              {user?.email && <div className="home-menu-mail">{user.email}</div>}
+              <button className="home-menu-item" onClick={handleLogout}>
+                Sign out
+              </button>
+            </div>
+          )}
         </div>
       </aside>
 
-      <div className="overview-main">
-        <header className="overview-topbar">
-          <div>
-            <p className="overview-kicker">Repository ingestion</p>
-            <h1>Analyze a repository without changing the pipeline underneath</h1>
+      {/* ── Main ─────────────────────────────────────────────── */}
+      <main className="home-main">
+        <div className="home-mobilebar">
+          <button className="home-burger" onClick={() => setNavOpen(true)} aria-label="Open menu">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+              <line x1="3" y1="6" x2="21" y2="6" strokeLinecap="round" />
+              <line x1="3" y1="12" x2="21" y2="12" strokeLinecap="round" />
+              <line x1="3" y1="18" x2="21" y2="18" strokeLinecap="round" />
+            </svg>
+          </button>
+          <div className="home-brand">
+            <span className="home-brand-mark">RM</span>
+            RepoMind
           </div>
+        </div>
 
-          <div className="overview-topbar-actions">
-            <div className="overview-status-badge">
-              <span className="overview-status-dot" />
-              Systems nominal
-            </div>
-            <button className="overview-logout" onClick={handleLogout}>
-              Logout
+        <div className="home-stage">
+          <h1 className="home-title">What repository do you want to understand?</h1>
+
+          <div
+            className={`home-field ${ingest === INGEST.ERROR ? "is-error" : ""} ${ingest === INGEST.SUCCESS ? "is-success" : ""}`}
+          >
+            <input
+              className="home-input"
+              type="url"
+              placeholder="Paste a GitHub repository URL"
+              value={repoUrl}
+              onChange={(e) => {
+                setRepoUrl(e.target.value);
+                if (ingest === INGEST.ERROR) setIngest(INGEST.IDLE);
+              }}
+              onKeyDown={(e) => e.key === "Enter" && handleIngest()}
+              disabled={busy}
+              spellCheck={false}
+              autoComplete="off"
+              aria-label="GitHub repository URL"
+            />
+            <button
+              className="home-send"
+              onClick={handleIngest}
+              disabled={busy || !repoUrl.trim()}
+              aria-label="Analyze repository"
+            >
+              {ingest === INGEST.LOADING ? (
+                <span className="home-spinner" aria-hidden="true" />
+              ) : (
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                  <line x1="5" y1="12" x2="19" y2="12" strokeLinecap="round" />
+                  <polyline points="12 5 19 12 12 19" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              )}
             </button>
           </div>
-        </header>
 
-        <section className="overview-hero-grid">
-          <article className="overview-ingest-card">
-            <div className="overview-card-head">
-              <div>
-                <p className="overview-mini-label">Current task</p>
-                <h2>Connect a GitHub repository and start the analysis workflow</h2>
-              </div>
-              <div className="overview-stage-pill">Stage 1 · Ingestion</div>
-            </div>
+          {ingest === INGEST.ERROR && <p className="home-note error">{errorMsg}</p>}
+          {ingest === INGEST.SUCCESS && (
+            <p className="home-note success">Opening the repository workspace…</p>
+          )}
 
-            <p className="overview-card-copy">
-              Paste a public GitHub repository URL. RepoMind will keep the same backend and auth
-              behavior, then send the repo into your existing ingestion flow.
-            </p>
-
-            <div
-              className={`overview-input-shell ${ingest === INGEST.ERROR ? "is-error" : ""} ${ingest === INGEST.SUCCESS ? "is-success" : ""}`}
-            >
-              <label className="overview-input-label" htmlFor="repo-url">
-                Repository URL
-              </label>
-              <div className="overview-input-row">
-                <input
-                  id="repo-url"
-                  className="overview-input"
-                  type="url"
-                  placeholder="https://github.com/owner/repository"
-                  value={repoUrl}
-                  onChange={(e) => {
-                    setRepoUrl(e.target.value);
+          {(ingest === INGEST.IDLE || ingest === INGEST.ERROR) && (
+            <div className="home-suggestions">
+              {["facebook/react", "vercel/next.js", "spring-projects/spring-boot"].map((slug) => (
+                <button
+                  key={slug}
+                  type="button"
+                  className="home-suggestion"
+                  onClick={() => {
+                    setRepoUrl(`https://github.com/${slug}`);
                     if (ingest === INGEST.ERROR) setIngest(INGEST.IDLE);
                   }}
-                  onKeyDown={(e) => e.key === "Enter" && handleIngest()}
-                  disabled={ingest === INGEST.LOADING || ingest === INGEST.SUCCESS}
-                  spellCheck={false}
-                  autoComplete="off"
-                  aria-label="GitHub repository URL"
-                />
-                <button
-                  className={`overview-submit ${ingest === INGEST.LOADING ? "is-loading" : ""} ${ingest === INGEST.SUCCESS ? "is-success" : ""}`}
-                  onClick={handleIngest}
-                  disabled={ingest === INGEST.LOADING || ingest === INGEST.SUCCESS || !repoUrl.trim()}
                 >
-                  {ingest === INGEST.LOADING ? (
-                    <>
-                      <span className="overview-spinner" aria-hidden="true" />
-                      Scanning
-                    </>
-                  ) : ingest === INGEST.SUCCESS ? (
-                    "Complete"
-                  ) : ingest === INGEST.ERROR ? (
-                    "Retry"
-                  ) : (
-                    "Start analysis"
-                  )}
+                  {slug}
                 </button>
-              </div>
+              ))}
             </div>
-
-            {ingest === INGEST.ERROR && (
-              <p className="overview-feedback error">{errorMsg}</p>
-            )}
-
-            {ingest === INGEST.SUCCESS && repoData && (
-              <div className="overview-result-card">
-                {[
-                  ["Repo ID", repoData.repoId],
-                  ["Status", repoData.status],
-                  ["Message", repoData.message],
-                ].map(([label, value]) => (
-                  <div key={label} className="overview-result-row">
-                    <span>{label}</span>
-                    <strong>{value}</strong>
-                  </div>
-                ))}
-                <p className="overview-feedback success">Redirecting to the repository workspace...</p>
-              </div>
-            )}
-
-            {(ingest === INGEST.IDLE || ingest === INGEST.ERROR) && (
-              <div className="overview-steps">
-                {[
-                  ["01", "Paste a valid public GitHub repository link"],
-                  ["02", "RepoMind sends it through the current ingest logic"],
-                  ["03", "Move into the analysis workspace after success"],
-                ].map(([step, text]) => (
-                  <div key={step} className="overview-step">
-                    <span>{step}</span>
-                    <p>{text}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </article>
-
-          <aside className="overview-insight-column">
-            <section className="overview-panel">
-              <div className="overview-panel-head">
-                <p className="overview-mini-label">Capabilities</p>
-                <span>Current UI foundation</span>
-              </div>
-
-              <div className="overview-feature-list">
-                {[
-                  "Repository tree mapping",
-                  "Dependency and architecture context",
-                  "AI analysis preparation",
-                  "Future-ready design system for the full app",
-                ].map((item) => (
-                  <div key={item} className="overview-feature-item">
-                    <span className="overview-feature-dot" />
-                    <p>{item}</p>
-                  </div>
-                ))}
-              </div>
-            </section>
-
-            <section className="overview-panel">
-              <div className="overview-panel-head">
-                <p className="overview-mini-label">Session</p>
-                <span>Connected account</span>
-              </div>
-
-              <div className="overview-user-meta">
-                <div className="overview-user-meta-row">
-                  <span>User ID</span>
-                  <strong>{user?.id ?? "-"}</strong>
-                </div>
-                <div className="overview-user-meta-row">
-                  <span>Auth provider</span>
-                  <strong>GitHub OAuth</strong>
-                </div>
-                <div className="overview-user-meta-row">
-                  <span>Token mode</span>
-                  <strong>JWT + refresh flow</strong>
-                </div>
-              </div>
-            </section>
-          </aside>
-        </section>
-      </div>
+          )}
+        </div>
+      </main>
     </div>
   );
 }

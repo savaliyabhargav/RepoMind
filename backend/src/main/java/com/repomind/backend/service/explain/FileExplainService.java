@@ -44,6 +44,9 @@ public class FileExplainService {
             Mermaid syntax rules (STRICT — invalid syntax causes rendering failure):
             - flowchart TD: nodes A[Label], decisions A{Condition}, ovals A((Start)), arrows -->
             - sequenceDiagram: participant declarations first, use ->> and -->>, Note over X: text
+            - EVERY statement must fit on ONE single line. NEVER break a Note, message label, or
+              node label across lines — a real newline inside a statement makes the parser fail.
+              If a Note needs multiple facts, separate them with commas on the same line.
             - classDiagram: fields as "+fieldName Type" (NO colon), methods as "+methodName(paramName Type) ReturnType" (NO colon after param or after closing paren)
               WRONG:  +id: UUID       CORRECT: +id UUID
               WRONG:  +find(id: UUID): User   CORRECT: +find(id UUID) User
@@ -101,18 +104,7 @@ public class FileExplainService {
             payload = fallback(file.getName());
         } else {
             String userPrompt = buildUserPrompt(file.getPath(), language, roleSummary, content);
-            try {
-                String model = modelForProvider(provider);
-                log.info("[explain] calling LLM provider={} model={}", provider, model);
-                AiGenerationResponse aiResponse = aiProviderRouter.resolve(provider)
-                        .generate(new AiGenerationRequest(provider, model, SYSTEM_PROMPT, userPrompt, 0.1, 4000));
-                log.info("[explain] LLM responded, rawLen={}", aiResponse.text().length());
-                log.debug("[explain] raw LLM response: {}", aiResponse.text());
-                payload = parsePayload(aiResponse.text(), file.getName());
-            } catch (Exception ex) {
-                log.error("[explain] LLM call failed for file={}: {}", file.getPath(), ex.getMessage(), ex);
-                payload = fallback(file.getName());
-            }
+            payload = generateWithFailover(provider, userPrompt, file);
         }
 
         return new FileExplainResponse(
@@ -127,6 +119,44 @@ public class FileExplainService {
                 payload.summary(),
                 payload.concepts()
         );
+    }
+
+    // Tried in order when the requested provider fails (rate limit, network, bad JSON).
+    // Returning a real error beats a fake generic diagram: the frontend caches successful
+    // responses per file, so a fake diagram would stick even after the provider recovers.
+    private static final List<String> PROVIDER_FAILOVER_ORDER = List.of("GROQ", "NVIDIA_DEV", "GEMINI");
+
+    private ExplainPayload generateWithFailover(String requestedProvider, String userPrompt, FileNode file) {
+        List<String> candidates = new java.util.ArrayList<>();
+        candidates.add(requestedProvider);
+        PROVIDER_FAILOVER_ORDER.stream()
+                .filter(p -> !p.equals(requestedProvider))
+                .forEach(candidates::add);
+
+        Exception lastFailure = null;
+        for (String candidate : candidates) {
+            try {
+                String model = modelForProvider(candidate);
+                log.info("[explain] calling LLM provider={} model={}", candidate, model);
+                AiGenerationResponse aiResponse = aiProviderRouter.resolve(candidate)
+                        .generate(new AiGenerationRequest(candidate, model, SYSTEM_PROMPT, userPrompt, 0.1, 4000));
+                log.info("[explain] LLM responded provider={} rawLen={}", candidate, aiResponse.text().length());
+                log.debug("[explain] raw LLM response: {}", aiResponse.text());
+                ExplainPayload parsed = parsePayload(aiResponse.text(), file.getName());
+                if (parsed != null) {
+                    return parsed;
+                }
+                log.warn("[explain] provider={} returned an unparseable diagram for file={} — trying next provider",
+                        candidate, file.getPath());
+            } catch (Exception ex) {
+                lastFailure = ex;
+                log.warn("[explain] provider={} failed for file={}: {} — trying next provider",
+                        candidate, file.getPath(), ex.getMessage());
+            }
+        }
+        throw new IllegalStateException(
+                "Diagram generation failed — all AI providers are unavailable or rate limited. Try again shortly.",
+                lastFailure);
     }
 
     private String buildUserPrompt(String path, String language, String role, String content) {
@@ -167,14 +197,14 @@ public class FileExplainService {
                     : List.of();
             if (mermaidCode.isBlank()) {
                 log.warn("[explain] LLM returned empty mermaidCode for file={}", fileName);
-                return fallback(fileName);
+                return null;
             }
             log.info("[explain] diagram parsed ok diagramType={} conceptCount={}", diagramType, concepts.size());
             return new ExplainPayload(diagramType, mermaidCode, summary, concepts);
         } catch (Exception ex) {
             log.error("[explain] JSON parse failed for file={}: {} — raw snippet: {}", fileName, ex.getMessage(),
                     text.length() > 300 ? text.substring(0, 300) : text);
-            return fallback(fileName);
+            return null;
         }
     }
 

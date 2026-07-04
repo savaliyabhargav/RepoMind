@@ -5,8 +5,15 @@ import java.util.regex.Pattern;
 
 public final class GitHubUrlParser {
 
-    private static final Pattern PATTERN =
-            Pattern.compile("github\\.com/([^/]+)/([^/.]+)(?:\\.git)?");
+    // Anchored: only http(s) github.com URLs qualify — an unanchored find() would
+    // accept ftp:// schemes and hostnames that merely contain "github.com".
+    // Owner: GitHub usernames are alphanumeric with inner hyphens.
+    // Repo: may contain dots (e.g. next.js); a trailing ".git" is stripped, and
+    // extra path segments or query strings after the repo (e.g. /tree/main) are tolerated.
+    private static final Pattern PATTERN = Pattern.compile(
+            "^https?://(?:www\\.)?github\\.com/"
+            + "([A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)/"
+            + "([A-Za-z0-9._-]+?)(?:\\.git)?(?:[/?#].*)?$");
 
     private GitHubUrlParser() {}
 
@@ -19,12 +26,13 @@ public final class GitHubUrlParser {
     }
 
     public static boolean isValid(String url) {
-        return PATTERN.matcher(url).find();
+        return url != null && PATTERN.matcher(url.trim()).matches();
     }
 
     private static Matcher match(String url) {
-        Matcher m = PATTERN.matcher(url);
-        if (!m.find()) throw new IllegalArgumentException("Invalid GitHub URL: " + url);
+        if (url == null) throw new IllegalArgumentException("Invalid GitHub URL: null");
+        Matcher m = PATTERN.matcher(url.trim());
+        if (!m.matches()) throw new IllegalArgumentException("Invalid GitHub URL: " + url);
         return m;
     }
 }

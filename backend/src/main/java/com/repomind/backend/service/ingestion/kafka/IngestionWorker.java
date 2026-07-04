@@ -53,8 +53,14 @@ public class IngestionWorker {
     public void processIngestRequest(IngestRequestMessage message, Acknowledgment ack) {
         log.info("Worker picked up repoId={} url={}", message.repoId(), message.url());
 
-        Repo repo = repoRepository.findById(message.repoId())
-                .orElseThrow(() -> new IllegalStateException("Repo not found: " + message.repoId()));
+        Repo repo = repoRepository.findById(message.repoId()).orElse(null);
+        if (repo == null) {
+            // Repo row was deleted after the message was queued. Throwing here would
+            // leave the message unacked and redelivered forever — ack and move on.
+            log.error("Repo not found for repoId={} — acking and skipping", message.repoId());
+            ack.acknowledge();
+            return;
+        }
 
         try {
             repo.setStatus("INGESTING");
@@ -63,8 +69,8 @@ public class IngestionWorker {
             String owner = GitHubUrlParser.extractOwner(message.url());
             String repoName = GitHubUrlParser.extractRepoName(message.url());
 
-            // Find existing canonical or create one — assigned exactly once (effectively final)
-            final CanonicalRepo canonical = resolveCanonical(owner, repoName);
+            CanonicalResolution resolution = resolveCanonical(owner, repoName);
+            CanonicalRepo canonical = resolution.canonical();
 
             if ("READY".equals(canonical.getStatus())) {
                 // File tree already exists in DB — skip GitHub entirely
@@ -75,7 +81,25 @@ public class IngestionWorker {
                 return;
             }
 
-            // canonical is FETCHING — we are the first worker for this repo
+            if (!resolution.created()) {
+                // Another worker created this canonical and may still be fetching.
+                // Wait for it to finish rather than fetching the same tree twice.
+                CanonicalRepo ready = awaitCanonicalReady(canonical.getId());
+                if (ready != null) {
+                    linkRepoToCanonical(repo, ready);
+                    log.info("Canonical became READY while waiting for {}/{} — repoId={} linked",
+                            owner, repoName, message.repoId());
+                    ack.acknowledge();
+                    return;
+                }
+                // Still FETCHING after the wait — the original worker likely crashed.
+                // Take over; file node writes are idempotent so a double-publish is safe.
+                log.warn("Canonical {}/{} stuck in FETCHING — taking over the fetch for repoId={}",
+                        owner, repoName, message.repoId());
+                canonical = canonicalRepoRepository.findById(canonical.getId()).orElse(canonical);
+            }
+
+            final UUID canonicalId = canonical.getId();
             var githubResult = fetchFromGitHub(owner, repoName, message.repoId());
             GitHubRepoResponse info = githubResult.getT1();
             GitHubTreeResponse tree = githubResult.getT2();
@@ -85,12 +109,12 @@ public class IngestionWorker {
             }
 
             List<FileNodeMessage> fileNodes = tree.tree().stream()
-                    .map(entry -> buildFileNodeMessage(canonical.getId(), message.repoId(), entry))
+                    .map(entry -> buildFileNodeMessage(canonicalId, message.repoId(), entry))
                     .toList();
 
             // Update canonical with real GitHub data and mark it READY
             canonical.setRepoName(info.name());
-            canonical.setPrivate(info.isPrivate());
+            canonical.setPrivate(Boolean.TRUE.equals(info.isPrivate()));
             canonical.setDefaultBranch(info.defaultBranch());
             canonical.setSizeKb(info.size());
             canonical.setFileCount(fileNodes.size());
@@ -117,7 +141,7 @@ public class IngestionWorker {
 
             // Publish file nodes to Kafka for background batch DB write
             fileNodes.forEach(node ->
-                    fileNodeProducer.send("repo-filenodes-raw", canonical.getId().toString(), node));
+                    fileNodeProducer.send("repo-filenodes-raw", canonicalId.toString(), node));
             log.info("Published {} file nodes to Kafka for batch DB write", fileNodes.size());
 
             ack.acknowledge();
@@ -139,32 +163,60 @@ public class IngestionWorker {
     }
 
     /**
+     * The canonical row for this repo plus whether THIS worker created it.
+     * created == false means another worker owns the fetch (or already finished it).
+     */
+    private record CanonicalResolution(CanonicalRepo canonical, boolean created) {}
+
+    /**
      * Returns the canonical row for this repo, creating it if it doesn't exist yet.
-     * Always returns exactly one non-null CanonicalRepo, assigned once so it is
-     * effectively final for use in lambdas.
      *
      * On a race between two workers: the unique constraint (owner, repo_name, provider)
      * causes one INSERT to fail — the loser fetches what the winner created.
      */
-    private CanonicalRepo resolveCanonical(String owner, String repoName) {
-        return canonicalRepoRepository
-                .findByOwnerAndRepoNameAndProvider(owner, repoName, "GITHUB")
-                .orElseGet(() -> {
-                    try {
-                        return canonicalRepoRepository.save(CanonicalRepo.builder()
-                                .owner(owner)
-                                .repoName(repoName)
-                                .provider("GITHUB")
-                                .status("FETCHING")
-                                .build());
-                    } catch (DataIntegrityViolationException ex) {
-                        // Another worker inserted first — fetch theirs
-                        return canonicalRepoRepository
-                                .findByOwnerAndRepoNameAndProvider(owner, repoName, "GITHUB")
-                                .orElseThrow(() -> new IllegalStateException(
-                                        "Canonical missing after constraint race for " + owner + "/" + repoName));
-                    }
-                });
+    private CanonicalResolution resolveCanonical(String owner, String repoName) {
+        var existing = canonicalRepoRepository
+                .findByOwnerAndRepoNameAndProvider(owner, repoName, "GITHUB");
+        if (existing.isPresent()) {
+            return new CanonicalResolution(existing.get(), false);
+        }
+        try {
+            CanonicalRepo created = canonicalRepoRepository.save(CanonicalRepo.builder()
+                    .owner(owner)
+                    .repoName(repoName)
+                    .provider("GITHUB")
+                    .status("FETCHING")
+                    .build());
+            return new CanonicalResolution(created, true);
+        } catch (DataIntegrityViolationException ex) {
+            // Another worker inserted first — fetch theirs
+            CanonicalRepo winner = canonicalRepoRepository
+                    .findByOwnerAndRepoNameAndProvider(owner, repoName, "GITHUB")
+                    .orElseThrow(() -> new IllegalStateException(
+                            "Canonical missing after constraint race for " + owner + "/" + repoName));
+            return new CanonicalResolution(winner, false);
+        }
+    }
+
+    // How long to wait for another worker's in-flight fetch before taking over.
+    // Kept well under Kafka's max.poll.interval so waiting never triggers a rebalance.
+    private static final long CANONICAL_WAIT_TIMEOUT_MS = 60_000L;
+    private static final long CANONICAL_WAIT_POLL_MS = 3_000L;
+
+    /**
+     * Polls the canonical row until it turns READY or the timeout elapses.
+     * Returns the READY canonical, or null if it is still FETCHING (stale/crashed fetcher).
+     */
+    private CanonicalRepo awaitCanonicalReady(UUID canonicalId) throws InterruptedException {
+        long deadline = System.currentTimeMillis() + CANONICAL_WAIT_TIMEOUT_MS;
+        while (System.currentTimeMillis() < deadline) {
+            Thread.sleep(CANONICAL_WAIT_POLL_MS);
+            CanonicalRepo current = canonicalRepoRepository.findById(canonicalId).orElse(null);
+            if (current != null && "READY".equals(current.getStatus())) {
+                return current;
+            }
+        }
+        return null;
     }
 
     private void linkRepoToCanonical(Repo repo, CanonicalRepo canonical) {
@@ -183,6 +235,10 @@ public class IngestionWorker {
     // 3 attempts total: 1 initial + 2 retries at 30s and 60s
     private static final int MAX_TRANSIENT_ATTEMPTS = 3;
     private static final long[] TRANSIENT_BACKOFF_MS = {30_000L, 60_000L};
+
+    // Longest we will sleep waiting for a GitHub rate-limit window to reset.
+    // Must stay under Kafka's max.poll.interval.ms or the broker evicts this consumer.
+    private static final long MAX_RATE_LIMIT_WAIT_MS = 180_000L;
 
     /**
      * Calls GitHub for repo metadata and file tree with two layers of retry:
@@ -215,6 +271,14 @@ public class IngestionWorker {
 
             } catch (GitHubRateLimitException ex) {
                 long sleepMs = Math.max(0, ex.getResetEpochSeconds() - Instant.now().getEpochSecond() + 2) * 1000L;
+                if (sleepMs > MAX_RATE_LIMIT_WAIT_MS) {
+                    // Sleeping longer than Kafka's max.poll.interval would trigger a consumer
+                    // rebalance and endless redelivery. Fail fast with an actionable message.
+                    throw new IllegalStateException(String.format(
+                            "GitHub API rate limit exceeded — resets in ~%d min. "
+                            + "Set GITHUB_TOKEN to raise the limit from 60 to 5000 requests/hour, "
+                            + "or retry later.", Math.max(1, sleepMs / 60_000)));
+                }
                 log.warn("Rate limited for repoId={}. Sleeping {}ms until window resets.", repoId, sleepMs);
                 Thread.sleep(sleepMs);
                 // Does not increment transientAttempts — rate limit wait is deterministic

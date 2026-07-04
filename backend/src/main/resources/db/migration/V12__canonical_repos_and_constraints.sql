@@ -19,8 +19,7 @@ CREATE TABLE canonical_repos (
 
 -- 2. Wipe existing file data — file_nodes must be re-ingested
 --    (development environment: no existing user data is at risk)
-TRUNCATE file_node_dependencies;
-TRUNCATE file_nodes;
+TRUNCATE file_node_dependencies, file_nodes;
 
 -- 3. Swap file_nodes.repo_id → canonical_repo_id
 DROP INDEX idx_file_nodes_repo_id;
@@ -35,6 +34,34 @@ CREATE INDEX idx_file_nodes_canonical_repo_id ON file_nodes(canonical_repo_id);
 ALTER TABLE repos
     ADD COLUMN canonical_repo_id UUID REFERENCES canonical_repos(id) ON DELETE SET NULL;
 
--- 5. A1 — prevent the same user from ingesting the same URL twice at the DB level
+-- 5. Dedupe existing (user_id, url) duplicates before the unique constraint can be added.
+--    Keep the newest repo row per (user_id, url); repoint its analyses to the survivor,
+--    then delete the leftover duplicate rows (their analyses are preserved via the repoint).
+UPDATE analyses a
+SET repo_id = ranked.keeper_id
+FROM (
+    SELECT id,
+           FIRST_VALUE(id) OVER (
+               PARTITION BY user_id, url
+               ORDER BY created_at DESC, id DESC
+           ) AS keeper_id
+    FROM repos
+) ranked
+WHERE a.repo_id = ranked.id
+  AND ranked.id <> ranked.keeper_id;
+
+DELETE FROM repos r
+USING (
+    SELECT id,
+           ROW_NUMBER() OVER (
+               PARTITION BY user_id, url
+               ORDER BY created_at DESC, id DESC
+           ) AS rn
+    FROM repos
+) d
+WHERE r.id = d.id
+  AND d.rn > 1;
+
+-- 6. A1 — prevent the same user from ingesting the same URL twice at the DB level
 ALTER TABLE repos
     ADD CONSTRAINT uq_repos_user_url UNIQUE (user_id, url);

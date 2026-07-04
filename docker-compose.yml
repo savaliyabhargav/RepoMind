@@ -147,6 +147,9 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     container_name: repomind-frontend
+    environment:
+      # Inside the compose network the backend resolves by service name
+      VITE_PROXY_TARGET: http://backend:8080
     ports:
       - "5173:5173"
     depends_on:

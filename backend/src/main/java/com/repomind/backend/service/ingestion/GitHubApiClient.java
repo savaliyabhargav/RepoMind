@@ -8,6 +8,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientRequestException;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 import reactor.core.publisher.Mono;
 
 import java.time.Instant;
@@ -73,10 +74,13 @@ public class GitHubApiClient {
 
                     return response.bodyToMono(responseType);
                 })
-                // Network-level failures (connection refused, DNS error, read timeout) are also
-                // transient — wrap them so the worker's retry loop handles them uniformly.
+                // Network-level failures (SSL errors, connection reset, DNS, timeout) are transient.
+                // Exclude WebClientResponseException (those are real HTTP error responses handled above)
+                // and exceptions already classified as rate-limit or transient.
                 .onErrorMap(
-                        ex -> ex instanceof WebClientRequestException,
+                        ex -> !(ex instanceof WebClientResponseException)
+                              && !(ex instanceof GitHubRateLimitException)
+                              && !(ex instanceof GitHubTransientException),
                         ex -> new GitHubTransientException("GitHub network error: " + ex.getMessage(), ex)
                 );
     }

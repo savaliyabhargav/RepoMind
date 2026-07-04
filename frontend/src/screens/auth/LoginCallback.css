@@ -1,185 +1,186 @@
-@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;450;500;600;700&display=swap");
 
 :root {
-  --callback-text: #edf4ff;
-  --callback-text-soft: #9eb2d1;
-  --callback-text-dim: #6c83a8;
-  --callback-panel: rgba(13, 23, 37, 0.88);
-  --callback-border: rgba(134, 170, 230, 0.15);
-  --callback-border-strong: rgba(134, 170, 230, 0.26);
-  --callback-accent: #74a7ff;
-  --callback-success: #49d29d;
-  --callback-danger: #ff7f94;
-  --callback-font: "Plus Jakarta Sans", "Segoe UI", sans-serif;
-  --callback-mono: "IBM Plex Mono", monospace;
+  --rm-bg: #18171c;
+  --rm-side: #1d1c22;
+  --rm-surface: #232128;
+  --rm-surface-2: #2c2a33;
+  --rm-accent: #43404d;
+  --rm-accent-2: #524e5e;
+  --rm-text: #eceaf0;
+  --rm-muted: #a6a2b0;
+  --rm-faint: #6f6b79;
+  --rm-line: rgba(255, 255, 255, 0.08);
+  --rm-line-2: rgba(255, 255, 255, 0.16);
+  --rm-success: #84c1a3;
+  --rm-danger: #d98a98;
+  --rm-font: "Inter", -apple-system, "Segoe UI", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
 }
 
 .callback-root {
-  position: relative;
   min-height: 100vh;
   display: grid;
   place-items: center;
   padding: 24px;
-  color: var(--callback-text);
-  overflow: hidden;
+  background:
+    radial-gradient(120% 80% at 50% -10%, #26242c 0%, transparent 55%),
+    var(--rm-bg);
+  color: var(--rm-text);
+  font-family: var(--rm-font);
+  -webkit-font-smoothing: antialiased;
 }
 
+/* Decorative layers from the old design — neutralized for the flat look */
 .callback-grid,
 .callback-glow {
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-}
-
-.callback-grid {
-  background:
-    radial-gradient(circle at 18% 18%, rgba(116, 167, 255, 0.16), transparent 20%),
-    radial-gradient(circle at 82% 20%, rgba(73, 210, 157, 0.08), transparent 18%),
-    linear-gradient(180deg, #06101b 0%, #091321 46%, #0c1828 100%);
-}
-
-.callback-glow {
-  background-image:
-    linear-gradient(rgba(255, 255, 255, 0.018) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.018) 1px, transparent 1px);
-  background-size: 34px 34px;
-  mask-image: radial-gradient(circle at center, black 42%, transparent 82%);
-  opacity: 0.5;
+  display: none;
 }
 
 .callback-card {
-  position: relative;
-  z-index: 1;
-  width: min(540px, 100%);
-  padding: 30px;
-  border: 1px solid var(--callback-border);
-  border-radius: 32px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.015)),
-    var(--callback-panel);
-  backdrop-filter: blur(18px);
-  box-shadow: 0 28px 80px rgba(2, 8, 18, 0.34);
+  width: 100%;
+  max-width: 410px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 40px 34px;
+  border: 1px solid var(--rm-line);
+  border-radius: 28px;
+  background: var(--rm-surface);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5);
 }
 
 .callback-logo {
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 24px;
-  color: var(--callback-text-soft);
-  font: 600 13px/1 var(--callback-mono);
+  margin-bottom: 30px;
+  font: 600 0.95rem/1 var(--rm-font);
+  letter-spacing: -0.01em;
 }
 
-.cb-bracket {
-  color: var(--callback-accent);
+.callback-logo-mark {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  border: 1px solid var(--rm-line-2);
+  background: var(--rm-accent);
+  color: var(--rm-text);
+  font: 700 11px/1 var(--rm-font);
 }
 
 .cb-state {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  gap: 14px;
+  align-items: center;
+  gap: 18px;
+  width: 100%;
 }
 
 .cb-icon-wrap {
-  width: 72px;
-  height: 72px;
+  width: 56px;
+  height: 56px;
   display: grid;
   place-items: center;
-  border: 1px solid var(--callback-border);
-  border-radius: 22px;
-  background: rgba(255, 255, 255, 0.025);
-  color: var(--callback-accent);
+  border: 1px solid var(--rm-line-2);
+  border-radius: 18px;
+  background: var(--rm-accent);
+  color: var(--rm-text);
 }
 
 .cb-icon-wrap.cb-success {
-  border-color: rgba(73, 210, 157, 0.26);
-  color: var(--callback-success);
+  border-color: rgba(132, 193, 163, 0.45);
+  color: var(--rm-success);
 }
 
 .cb-icon-wrap.cb-error {
-  border-color: rgba(255, 127, 148, 0.26);
-  color: var(--callback-danger);
+  border-color: rgba(217, 138, 152, 0.45);
+  color: var(--rm-danger);
 }
 
 .cb-spinner,
 .cb-check,
 .cb-x {
-  width: 30px;
-  height: 30px;
+  width: 26px;
+  height: 26px;
 }
 
 .cb-spinner {
-  animation: callbackSpin 1s linear infinite;
+  animation: callbackSpin 0.8s linear infinite;
 }
 
 .cb-title {
-  margin: 2px 0 0;
-  font: 800 clamp(2rem, 4vw, 2.8rem)/1 var(--callback-font);
-  letter-spacing: -0.06em;
+  margin: 0;
+  font: 600 1.5rem/1.2 var(--rm-font);
+  letter-spacing: -0.025em;
 }
 
 .cb-subtitle {
   margin: 0;
-  color: var(--callback-text-soft);
-  font: 500 15px/1.8 var(--callback-font);
+  max-width: 320px;
+  color: var(--rm-muted);
+  font: 400 0.95rem/1.55 var(--rm-font);
 }
 
 .cb-steps {
   width: 100%;
-  margin: 4px 0 0;
+  max-width: 280px;
+  margin: 6px 0 0;
   padding: 0;
   list-style: none;
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .cb-step {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 14px 16px;
-  border: 1px solid var(--callback-border);
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.025);
-  color: var(--callback-text-soft);
-  font: 500 12px/1.5 var(--callback-mono);
+  gap: 11px;
+  padding: 12px 15px;
+  border: 1px solid var(--rm-line);
+  border-radius: 13px;
+  background: rgba(255, 255, 255, 0.022);
+  color: var(--rm-muted);
+  font: 450 0.82rem/1.4 var(--rm-font);
 }
 
 .step-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 999px;
-  background: var(--callback-accent);
-  box-shadow: 0 0 0 6px rgba(116, 167, 255, 0.08);
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--rm-text);
+  flex-shrink: 0;
   animation: callbackPulse 1.4s ease-in-out infinite;
 }
 
 .cb-retry-btn {
   margin-top: 4px;
-  padding: 14px 18px;
-  border: 1px solid var(--callback-border-strong);
-  border-radius: 16px;
-  background: rgba(116, 167, 255, 0.08);
-  color: var(--callback-text);
-  font: 700 12px/1 var(--callback-mono);
+  padding: 13px 24px;
+  border: 1px solid var(--rm-line-2);
+  border-radius: 14px;
+  background: var(--rm-accent);
+  color: var(--rm-text);
+  font: 600 0.9rem/1 var(--rm-font);
   cursor: pointer;
+  transition: transform 150ms ease, background 150ms ease;
+}
+
+.cb-retry-btn:hover {
+  transform: translateY(-1px);
+  background: var(--rm-accent-2);
 }
 
 @keyframes callbackSpin {
-  to {
-    transform: rotate(360deg);
-  }
+  to { transform: rotate(360deg); }
 }
 
 @keyframes callbackPulse {
-  0%, 100% {
-    opacity: 0.45;
-    transform: scale(0.9);
-  }
-
-  50% {
-    opacity: 1;
-    transform: scale(1.12);
-  }
+  0%, 100% { opacity: 0.4; transform: scale(0.85); }
+  50% { opacity: 1; transform: scale(1.1); }
 }

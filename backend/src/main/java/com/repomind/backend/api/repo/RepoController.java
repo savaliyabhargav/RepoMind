@@ -60,6 +60,25 @@ public class RepoController {
         var existing = repoRepository.findByUrlAndUserId(url, userId);
         if (existing.isPresent()) {
             Repo repo = existing.get();
+
+            // If the canonical was never linked (previous ingestion failed, crashed, or was wiped
+            // by a migration) and the worker is not currently running — re-trigger ingestion.
+            boolean canonicalMissing = repo.getCanonicalRepo() == null;
+            boolean workerRunning = "INGESTING".equals(repo.getStatus());
+            if (canonicalMissing && !workerRunning) {
+                log.info("Re-triggering ingestion for repoId={} url={} previousStatus={} — canonical not linked",
+                        repo.getId(), url, repo.getStatus());
+                repo.setStatus("PENDING");
+                repo.setErrorMsg(null);
+                repoRepository.save(repo);
+                repoIngestionProducer.submitIngestion(repo.getId(), url, userId);
+                return ResponseEntity.accepted().body(Map.of(
+                        "repoId", repo.getId(),
+                        "status", "PENDING",
+                        "message", "Repository ingestion restarted"
+                ));
+            }
+
             log.info("Duplicate ingest request for url={} userId={} — returning existing repoId={}", url, userId, repo.getId());
             return ResponseEntity.ok(Map.of(
                     "repoId", repo.getId(),
@@ -149,9 +168,16 @@ public class RepoController {
         // No Redis — check if ingestion has linked a canonical yet
         var canonical = repo.getCanonicalRepo();
         if (canonical == null) {
+            if ("FAILED".equals(repo.getStatus())) {
+                return ResponseEntity.unprocessableEntity().body(Map.of(
+                        "source", "failed",
+                        "status", "FAILED",
+                        "message", repo.getErrorMsg() != null ? repo.getErrorMsg() : "Repository ingestion failed"
+                ));
+            }
             return ResponseEntity.accepted().body(Map.of(
                     "source", "pending",
-                    "status", "INGESTING",
+                    "status", repo.getStatus(),
                     "message", "Repository is being ingested, retry shortly"
             ));
         }

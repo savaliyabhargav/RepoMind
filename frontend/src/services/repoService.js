@@ -6,6 +6,11 @@ const repoService = {
     return response.data;
   },
 
+  listRepos: async (userId) => {
+    const response = await api.get("/repo", { params: { userId } });
+    return response.data;
+  },
+
   getRepo: async (repoId) => {
     const response = await api.get(`/repo/${repoId}`);
     return response.data;

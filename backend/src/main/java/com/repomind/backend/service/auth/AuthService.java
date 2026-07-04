@@ -123,6 +123,12 @@ public class AuthService {
         return new AuthResponse(newJwt, newRawRefreshToken, user);
     }
 
+    @Transactional
+    public void logout(String rawRefreshToken) {
+        refreshTokenRepository.findByTokenHash(hashToken(rawRefreshToken))
+                .ifPresent(refreshTokenRepository::delete);
+    }
+
     // Simple DTO for the response
     public record AuthResponse(String accessToken, String refreshToken, User user) {}
 }

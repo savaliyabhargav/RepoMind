@@ -84,9 +84,8 @@ export default function LoginCallback() {
 
       <div className="callback-card">
         <div className="callback-logo">
-          <span className="cb-bracket">[</span>
-          <span className="cb-text">RepoMind</span>
-          <span className="cb-bracket">]</span>
+          <span className="callback-logo-mark">RM</span>
+          RepoMind
         </div>
 
         {status === STATUS.VERIFYING && (

@@ -1,221 +1,574 @@
 @import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap");
 
-.workspace-root {
+/* ═══════════════════════════════════════════════════════════════════════════
+   IDE workspace — VS Code-inspired dark chrome
+   Palette:  editor #0d1117 · panels #10151d · chrome #161b24 · border #232a36
+             accent #4d9de0 · text #c9d4e3 · dim #7d8aa0
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.ide-root {
+  --ide-editor: #0d1117;
+  --ide-panel: #10151d;
+  --ide-chrome: #161b24;
+  --ide-chrome-2: #1b2230;
+  --ide-border: #232a36;
+  --ide-accent: #4d9de0;
+  --ide-text: #c9d4e3;
+  --ide-text-strong: #e8eef8;
+  --ide-text-dim: #7d8aa0;
+  --ide-ui-font: "Segoe UI", -apple-system, BlinkMacSystemFont, "Plus Jakarta Sans", sans-serif;
+  --ide-mono: "IBM Plex Mono", "Cascadia Code", Consolas, monospace;
+
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) 26px;
   width: 100vw;
   height: 100vh;
-  color: #e8edf7;
-  background:
-    radial-gradient(circle at 20% 8%, rgba(255, 255, 255, 0.055), transparent 30%),
-    linear-gradient(135deg, #0b0b0c 0%, #151515 46%, #070707 100%);
-  font-family: "Plus Jakarta Sans", "Segoe UI", sans-serif;
   overflow: hidden;
+  color: var(--ide-text);
+  background: var(--ide-editor);
+  font-family: var(--ide-ui-font);
+  font-size: 13px;
 }
 
-.workspace-shell,
-.workspace-state {
-  width: 100vw;
-  height: 100vh;
-  margin: 0;
-}
-
-.workspace-shell {
-  display: grid;
-  grid-template-columns: minmax(280px, 380px) minmax(0, 1fr);
-  min-height: 0;
-}
-
-.workspace-shell.is-blank-section {
-  grid-template-columns: minmax(0, 1fr);
-}
-
-.workspace-file-panel,
-.workspace-main-panel,
-.workspace-state {
-  background: rgba(15, 15, 16, 0.94);
-}
-
-.workspace-file-panel {
-  min-width: 0;
-  min-height: 0;
-  display: grid;
-  grid-template-rows: 58px minmax(0, 1fr);
-  overflow: hidden;
-  border-right: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.workspace-file-panel-head {
+.ide-frame {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 0 14px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.09);
-  background: rgba(255, 255, 255, 0.025);
+  min-height: 0;
+  min-width: 0;
 }
 
-.workspace-file-panel-head span,
-.workspace-main-head span,
-.workspace-file-size {
-  display: block;
-  color: #7f8da3;
-  font: 700 11px/1.4 "IBM Plex Mono", monospace;
+/* ── Full-screen states (loading / processing / error) ─────────────────────── */
+
+.workspace-state {
+  grid-row: 1 / -1;
+  display: grid;
+  place-items: center;
+  gap: 14px;
+  align-content: center;
+  text-align: center;
+  background: var(--ide-editor);
+}
+
+.workspace-state p {
+  margin: 0;
+  max-width: 420px;
+  color: var(--ide-text);
+  font: 600 14px/1.6 var(--ide-ui-font);
+}
+
+.workspace-state a {
+  color: var(--ide-accent);
+  font: 600 13px/1 var(--ide-ui-font);
+  text-decoration: none;
+  border: 1px solid rgba(77, 157, 224, 0.4);
+  border-radius: 6px;
+  padding: 8px 18px;
+  transition: background 140ms ease;
+}
+
+.workspace-state a:hover {
+  background: rgba(77, 157, 224, 0.12);
+}
+
+.workspace-state.is-error p {
+  color: #f0879c;
+}
+
+.workspace-loader {
+  width: 30px;
+  height: 30px;
+  border: 3px solid rgba(77, 157, 224, 0.18);
+  border-top-color: var(--ide-accent);
+  border-radius: 50%;
+  animation: workspace-spin 0.8s linear infinite;
+}
+
+@keyframes workspace-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Activity bar ───────────────────────────────────────────────────────────── */
+
+.ide-activitybar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  width: 48px;
+  padding: 6px 0;
+  background: var(--ide-chrome);
+  border-right: 1px solid var(--ide-border);
+  flex-shrink: 0;
+}
+
+.ide-activity-btn {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 44px;
+  border: 0;
+  background: transparent;
+  color: #5d6a80;
+  cursor: pointer;
+  transition: color 130ms ease;
+}
+
+.ide-activity-btn svg {
+  width: 22px;
+  height: 22px;
+}
+
+.ide-activity-btn:hover {
+  color: var(--ide-text-strong);
+}
+
+.ide-activity-btn.is-active {
+  color: var(--ide-text-strong);
+}
+
+/* VS Code-style active indicator: 2px bar on the left edge */
+.ide-activity-btn.is-active::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 8px;
+  bottom: 8px;
+  width: 2px;
+  background: var(--ide-accent);
+  border-radius: 0 2px 2px 0;
+}
+
+.ide-activity-spacer {
+  flex: 1;
+}
+
+.ide-activity-home {
+  text-decoration: none;
+}
+
+/* ── Explorer sidebar ───────────────────────────────────────────────────────── */
+
+.ide-explorer {
+  display: flex;
+  flex-direction: column;
+  width: 288px;
+  min-width: 288px;
+  min-height: 0;
+  background: var(--ide-panel);
+  border-right: 1px solid var(--ide-border);
+}
+
+.ide-explorer-title {
+  padding: 10px 18px 8px;
+  color: var(--ide-text-dim);
+  font: 600 11px/1 var(--ide-ui-font);
+  letter-spacing: 0.09em;
   text-transform: uppercase;
 }
 
-.workspace-file-panel-head strong,
-.workspace-main-head strong {
-  display: block;
-  color: #dce5f4;
-  font-size: 13px;
+.ide-explorer-repo {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 12px 5px 14px;
+  color: var(--ide-text-strong);
+  background: rgba(255, 255, 255, 0.025);
+  border-top: 1px solid var(--ide-border);
+  border-bottom: 1px solid var(--ide-border);
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
 }
 
-.workspace-file-scroll {
+.ide-explorer-repo-icon {
+  width: 14px;
+  height: 14px;
+  color: var(--ide-accent);
+  flex-shrink: 0;
+}
+
+.ide-explorer-repo-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ide-explorer-repo-meta {
+  margin-left: auto;
+  padding: 1px 7px;
+  border-radius: 9px;
+  color: var(--ide-text-dim);
+  background: rgba(255, 255, 255, 0.06);
+  font: 600 10px/1.5 var(--ide-mono);
+  text-transform: none;
+}
+
+/* ── File tree ──────────────────────────────────────────────────────────────── */
+
+.ide-tree {
+  flex: 1;
   min-height: 0;
   overflow: auto;
-  padding: 6px 0 18px;
-  scrollbar-color: rgba(180, 180, 180, 0.34) rgba(255, 255, 255, 0.04);
+  padding: 4px 0 24px;
   scrollbar-width: thin;
+  scrollbar-color: rgba(125, 138, 160, 0.35) transparent;
 }
 
-.workspace-file-scroll::-webkit-scrollbar {
+.ide-tree::-webkit-scrollbar {
   width: 10px;
+  height: 10px;
 }
 
-.workspace-file-scroll::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.04);
-}
-
-.workspace-file-scroll::-webkit-scrollbar-thumb {
-  border: 2px solid rgba(255, 255, 255, 0.04);
-  border-radius: 999px;
-  background: rgba(180, 180, 180, 0.42);
-}
-
-.workspace-tree-group {
-  min-width: max-content;
-}
-
-.workspace-tree-row {
-  width: 100%;
-  min-width: max-content;
-  min-height: 24px;
-  display: grid;
-  grid-template-columns: 18px minmax(150px, 1fr) 58px;
-  align-items: center;
-  gap: 4px;
-  padding: 0 8px 0 calc(8px + (var(--tree-depth) * 15px));
-  border: 0;
-  border-radius: 0;
-  color: #cbd6e8;
+.ide-tree::-webkit-scrollbar-track {
   background: transparent;
-  font: inherit;
+}
+
+.ide-tree::-webkit-scrollbar-thumb {
+  border: 3px solid var(--ide-panel);
+  border-radius: 999px;
+  background: rgba(125, 138, 160, 0.35);
+}
+
+.ide-tree-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+  height: 24px;
+  padding: 0 8px 0 calc(6px + (var(--tree-depth) * 12px));
+  border: 0;
+  color: var(--ide-text);
+  background: transparent;
+  font: 400 13px/24px var(--ide-ui-font);
   text-align: left;
-}
-
-.workspace-tree-row {
   cursor: pointer;
+  white-space: nowrap;
 }
 
-.workspace-tree-row:hover {
-  background: rgba(255, 255, 255, 0.055);
+.ide-tree-row:hover {
+  background: rgba(255, 255, 255, 0.045);
 }
 
-.workspace-tree-row.is-selected {
+.ide-tree-row.is-selected {
   color: #ffffff;
-  background: rgba(255, 255, 255, 0.11);
+  background: rgba(77, 157, 224, 0.18);
+  box-shadow: inset 2px 0 0 var(--ide-accent);
 }
 
-.workspace-tree-chevron {
-  width: 18px;
-  color: #9aa7bb;
-  font: 700 18px/1 "IBM Plex Mono", monospace;
-  transform: rotate(0deg);
-  transition: transform 120ms ease;
+.ide-tree-chevron {
+  display: grid;
+  place-items: center;
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  color: var(--ide-text-dim);
+  transition: transform 110ms ease;
 }
 
-.workspace-tree-chevron.is-open {
+.ide-tree-chevron svg {
+  width: 12px;
+  height: 12px;
+}
+
+.ide-tree-chevron.is-open {
   transform: rotate(90deg);
 }
 
-.workspace-tree-name {
+.ide-item-icon {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+}
+
+.ide-tree-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ide-tree-size {
+  margin-left: auto;
+  color: var(--ide-text-dim);
+  font: 500 10px/1 var(--ide-mono);
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.ide-tree-row:hover .ide-tree-size,
+.ide-tree-row.is-selected .ide-tree-size {
+  opacity: 0.85;
+}
+
+/* ── Editor area ────────────────────────────────────────────────────────────── */
+
+.ide-editor {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  background: var(--ide-editor);
+}
+
+/* Tab bar */
+.ide-tabbar {
+  display: flex;
+  align-items: stretch;
+  justify-content: space-between;
+  height: 38px;
+  background: var(--ide-chrome);
+  border-bottom: 1px solid var(--ide-border);
+  flex-shrink: 0;
+}
+
+.ide-tabbar-tabs {
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+}
+
+.ide-tab {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  max-width: 260px;
+  padding: 0 10px 0 14px;
+  background: var(--ide-editor);
+  border-right: 1px solid var(--ide-border);
+  position: relative;
+}
+
+/* active-tab top accent line, exactly like VS Code */
+.ide-tab.is-active::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1.5px;
+  background: var(--ide-accent);
+}
+
+.ide-tab-name {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 13px;
-  line-height: 24px;
+  color: var(--ide-text-strong);
+  font: 500 13px/1 var(--ide-ui-font);
 }
 
-.workspace-tree-size {
-  color: #7f8da3;
-  font: 700 10px/1.4 "IBM Plex Mono", monospace;
-  text-align: right;
-  text-transform: none;
-}
-
-.workspace-main-panel {
-  min-width: 0;
-  min-height: 0;
+.ide-tab-close {
   display: grid;
-  grid-template-rows: 58px minmax(0, 1fr);
-  overflow: hidden;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border: 0;
+  border-radius: 4px;
+  color: var(--ide-text-dim);
+  background: transparent;
+  cursor: pointer;
+  flex-shrink: 0;
 }
 
-.workspace-main-head {
+.ide-tab-close svg {
+  width: 13px;
+  height: 13px;
+}
+
+.ide-tab-close:hover {
+  color: var(--ide-text-strong);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.ide-tab-hint {
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  color: var(--ide-text-dim);
+  font: 400 12.5px/1 var(--ide-ui-font);
+  font-style: italic;
+}
+
+.ide-tabbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 0 12px;
+  flex-shrink: 0;
+}
+
+.ide-tabbar-label {
+  color: var(--ide-text-dim);
+  font: 600 10px/1 var(--ide-ui-font);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* Breadcrumbs */
+.ide-breadcrumbs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 26px;
+  padding: 0 14px;
+  background: var(--ide-editor);
+  border-bottom: 1px solid var(--ide-border);
+  overflow: hidden;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.ide-crumb {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--ide-text-dim);
+  font: 400 12px/1 var(--ide-ui-font);
+}
+
+.ide-crumb .ide-item-icon {
+  width: 13px;
+  height: 13px;
+}
+
+.ide-crumb-leaf {
+  color: var(--ide-text);
+}
+
+.ide-crumb-sep {
+  width: 11px;
+  height: 11px;
+  margin: 0 1px;
+  color: #4a556a;
+}
+
+.ide-crumb-placeholder {
+  color: #4a556a;
+  font: 400 12px/1 var(--ide-mono);
+}
+
+/* Canvas container */
+.ide-canvas-wrap {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+}
+
+/* Coming-soon sections */
+.ide-coming-soon {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 6px;
+  text-align: center;
+}
+
+.ide-coming-soon-icon {
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  margin-bottom: 8px;
+  border: 1px solid var(--ide-border);
+  border-radius: 14px;
+  color: var(--ide-text-dim);
+  background: var(--ide-panel);
+}
+
+.ide-coming-soon-icon svg {
+  width: 26px;
+  height: 26px;
+}
+
+.ide-coming-soon h3 {
+  margin: 0;
+  color: var(--ide-text-strong);
+  font: 700 16px/1.3 var(--ide-ui-font);
+}
+
+.ide-coming-soon p {
+  margin: 0;
+  max-width: 340px;
+  color: var(--ide-text-dim);
+  font: 400 13px/1.6 var(--ide-ui-font);
+}
+
+/* ── Status bar ─────────────────────────────────────────────────────────────── */
+
+.ide-statusbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 14px;
-  padding: 0 16px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.09);
-  background: rgba(255, 255, 255, 0.025);
-}
-
-.workspace-main-head strong {
-  margin-top: 4px;
-}
-
-.workspace-main-head > span {
-  min-width: 0;
-  max-width: 56%;
+  height: 26px;
+  padding: 0 6px;
+  background: var(--ide-chrome-2);
+  border-top: 1px solid var(--ide-border);
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  text-transform: none;
 }
 
-.workspace-empty-area {
-  min-height: 0;
-  background:
-    linear-gradient(rgba(255, 255, 255, 0.028) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.028) 1px, transparent 1px),
-    rgba(9, 9, 10, 0.5);
-  background-size: 28px 28px;
+.ide-status-group {
+  display: flex;
+  align-items: center;
+  min-width: 0;
 }
+
+.ide-status-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 9px;
+  height: 26px;
+  color: var(--ide-text-dim);
+  font: 500 11.5px/1 var(--ide-ui-font);
+  white-space: nowrap;
+}
+
+.ide-status-item--accent {
+  color: var(--ide-accent);
+  font-weight: 600;
+}
+
+.ide-status-item--engine {
+  color: #9cc3e8;
+}
+
+.ide-status-icon {
+  width: 13px;
+  height: 13px;
+}
+
+.ide-status-brand {
+  color: var(--ide-text-dim);
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  border-left: 1px solid var(--ide-border);
+}
+
+/* ── Settings / pipeline testing panel ─────────────────────────────────────── */
 
 .workspace-test-area {
   min-height: 0;
   overflow: auto;
-  padding: 18px 16px 92px;
+  padding: 20px 18px 40px;
   display: grid;
   gap: 14px;
-  background:
-    linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
-    rgba(10, 10, 11, 0.7);
-  background-size: 24px 24px;
+  align-content: start;
 }
 
 .workspace-test-head h3 {
   margin: 0;
-  color: #e9eef9;
-  font-size: 17px;
+  color: var(--ide-text-strong);
+  font: 700 16px/1.3 var(--ide-ui-font);
 }
 
 .workspace-test-head p {
   margin: 4px 0 0;
-  color: #97a5bb;
-  font: 500 12px/1.5 "IBM Plex Mono", monospace;
+  color: var(--ide-text-dim);
+  font: 400 12.5px/1.5 var(--ide-ui-font);
 }
 
 .workspace-test-grid {
@@ -227,29 +580,26 @@
 .workspace-test-grid label {
   display: grid;
   gap: 6px;
-  color: #a8b3c5;
-  font: 600 11px/1.4 "IBM Plex Mono", monospace;
+  color: var(--ide-text-dim);
+  font: 600 10.5px/1.4 var(--ide-ui-font);
+  letter-spacing: 0.06em;
   text-transform: uppercase;
-}
-
-.workspace-test-grid label.is-wide {
-  grid-column: 1 / -1;
 }
 
 .workspace-test-grid input {
   width: 100%;
-  height: 36px;
+  height: 34px;
   padding: 0 10px;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 10px;
-  color: #e7edf7;
-  background: rgba(20, 20, 22, 0.92);
-  font: 500 12px/1 "IBM Plex Mono", monospace;
+  border: 1px solid var(--ide-border);
+  border-radius: 6px;
+  color: var(--ide-text-strong);
+  background: var(--ide-panel);
+  font: 500 12px/1 var(--ide-mono);
 }
 
 .workspace-test-grid input:focus {
   outline: none;
-  border-color: rgba(255, 255, 255, 0.34);
+  border-color: rgba(77, 157, 224, 0.55);
 }
 
 .workspace-test-actions {
@@ -259,30 +609,30 @@
 }
 
 .workspace-test-actions button {
-  height: 34px;
-  padding: 0 12px;
-  border: 1px solid rgba(255, 255, 255, 0.19);
-  border-radius: 9px;
-  color: #eaf0fa;
-  background: rgba(42, 42, 46, 0.9);
-  font: 700 11px/1 "IBM Plex Mono", monospace;
-  text-transform: uppercase;
+  height: 32px;
+  padding: 0 14px;
+  border: 1px solid rgba(77, 157, 224, 0.4);
+  border-radius: 6px;
+  color: var(--ide-text-strong);
+  background: rgba(77, 157, 224, 0.1);
+  font: 600 12px/1 var(--ide-ui-font);
   cursor: pointer;
+  transition: background 130ms ease;
 }
 
 .workspace-test-actions button:hover {
-  background: rgba(58, 58, 62, 0.96);
+  background: rgba(77, 157, 224, 0.2);
 }
 
 .workspace-test-actions button:disabled {
-  opacity: 0.6;
+  opacity: 0.55;
   cursor: wait;
 }
 
 .workspace-test-error {
   margin: 0;
-  color: #ff9bac;
-  font: 600 12px/1.5 "IBM Plex Mono", monospace;
+  color: #f0879c;
+  font: 500 12px/1.5 var(--ide-ui-font);
 }
 
 .workspace-test-results {
@@ -292,19 +642,19 @@
 }
 
 .workspace-result-box {
-  border: 1px solid rgba(255, 255, 255, 0.13);
-  border-radius: 12px;
-  background: rgba(14, 14, 16, 0.92);
+  border: 1px solid var(--ide-border);
+  border-radius: 8px;
+  background: var(--ide-panel);
   overflow: hidden;
 }
 
 .workspace-result-box h4 {
   margin: 0;
-  padding: 10px 12px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.09);
-  color: #dce5f4;
-  font: 700 11px/1 "IBM Plex Mono", monospace;
-  letter-spacing: 0.04em;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--ide-border);
+  color: var(--ide-text);
+  font: 600 11px/1 var(--ide-ui-font);
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
@@ -313,120 +663,72 @@
   padding: 10px 12px;
   max-height: 230px;
   overflow: auto;
-  color: #b8c6dc;
-  font: 500 11px/1.5 "IBM Plex Mono", monospace;
+  color: var(--ide-text-dim);
+  font: 400 11px/1.6 var(--ide-mono);
 }
 
-.workspace-state {
-  display: grid;
-  place-items: center;
-  gap: 14px;
-  align-content: center;
-  text-align: center;
-}
+/* ── Editor panes (single + split view) ─────────────────────────────────────
+   .bp-viewport is absolutely positioned (inset: 0), so .ide-pane-body MUST be
+   a positioned ancestor — otherwise the canvas anchors to the browser window
+   and paints over the whole IDE chrome. */
 
-.workspace-state p {
-  margin: 0;
-  color: #cbd6e8;
-  font-weight: 700;
-}
-
-.workspace-state a {
-  color: #d7d7d7;
-  font: 700 12px/1 "IBM Plex Mono", monospace;
-  text-decoration: none;
-}
-
-.workspace-state.is-error p {
-  color: #ff9aac;
-}
-
-.workspace-loader {
-  width: 34px;
-  height: 34px;
-  border: 3px solid rgba(255, 255, 255, 0.16);
-  border-top-color: #e5e7eb;
-  border-radius: 50%;
-  animation: workspace-spin 0.8s linear infinite;
-}
-
-.workspace-dock-hotspot {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 19;
-  height: 96px;
-}
-
-.workspace-dock {
-  position: fixed;
-  left: 50%;
-  bottom: 18px;
-  z-index: 20;
+.ide-panes {
   display: flex;
-  align-items: end;
-  gap: 12px;
-  padding: 10px 14px;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 24px;
-  background: rgba(22, 22, 24, 0.62);
-  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.34);
-  backdrop-filter: blur(22px);
-  opacity: 0;
-  pointer-events: none;
-  transform: translateX(-50%) translateY(18px);
-  transition: opacity 170ms ease, transform 170ms ease;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
 }
 
-.workspace-dock-hotspot:hover + .workspace-dock,
-.workspace-dock:hover {
-  opacity: 1;
-  pointer-events: auto;
-  transform: translateX(-50%) translateY(0);
+.ide-pane {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
 }
 
-.workspace-dock-item {
-  width: 52px;
-  height: 52px;
-  display: grid;
-  place-items: center;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 15px;
-  color: #e8edf7;
-  background: linear-gradient(180deg, rgba(70, 70, 74, 0.9), rgba(34, 34, 37, 0.96));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 10px 22px rgba(0, 0, 0, 0.24);
-  cursor: pointer;
-  transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
+.ide-pane--split {
+  border-left: 1px solid var(--ide-border);
 }
 
-.workspace-dock-item:hover,
-.workspace-dock-item.is-active {
-  border-color: rgba(255, 255, 255, 0.28);
-  background: linear-gradient(180deg, rgba(92, 92, 96, 0.94), rgba(44, 44, 48, 0.98));
-  transform: translateY(-8px);
+.ide-pane-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 34px;
+  padding: 0 10px;
+  background: var(--ide-chrome);
+  border-bottom: 1px solid var(--ide-border);
+  flex-shrink: 0;
 }
 
-.workspace-dock-item span {
-  font-size: 20px;
-  font-weight: 800;
+.ide-pane-head-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ide-text);
+  font: 500 12.5px/1 var(--ide-ui-font);
 }
 
-@keyframes workspace-spin {
-  to { transform: rotate(360deg); }
+.ide-pane-body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
 }
 
-/* ─── Blueprint Infinite Canvas ───────────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════════════════════
+   Blueprint Infinite Canvas
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 .bp-viewport {
-  position: relative;
-  width: 100%;
-  height: 100%;
+  position: absolute;
+  inset: 0;
   overflow: hidden;
   cursor: grab;
-  background-color: #080a0f;
+  background-color: #0b0f16;
   background-image:
-    radial-gradient(circle, rgba(77, 157, 224, 0.13) 1px, transparent 1px);
+    radial-gradient(circle, rgba(77, 157, 224, 0.11) 1px, transparent 1px);
   background-size: 24px 24px;
   user-select: none;
   -webkit-user-select: none;
@@ -454,12 +756,12 @@
   display: inline-block;
   padding: 28px 32px;
   border: 1px solid rgba(77, 157, 224, 0.22);
-  border-radius: 18px;
-  background: rgba(10, 13, 22, 0.97);
+  border-radius: 14px;
+  background: rgba(13, 17, 23, 0.97);
   box-shadow:
-    0 0 0 1px rgba(77, 157, 224, 0.08),
+    0 0 0 1px rgba(77, 157, 224, 0.07),
     0 20px 60px rgba(0, 0, 0, 0.6),
-    inset 0 1px 0 rgba(77, 157, 224, 0.12);
+    inset 0 1px 0 rgba(77, 157, 224, 0.1);
   min-width: 240px;
   min-height: 160px;
 }
@@ -498,18 +800,18 @@
 
 .bp-node-raw-label {
   margin: 0 0 10px;
-  color: #e8a25b;
-  font: 600 11px/1.4 "IBM Plex Mono", monospace;
+  color: #e0a862;
+  font: 600 12px/1.5 var(--ide-ui-font, "Segoe UI", sans-serif);
 }
 
 .bp-node-raw {
   margin: 0;
   padding: 14px;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 10px;
-  color: #b8c6dc;
-  background: rgba(14, 14, 18, 0.9);
-  font: 500 11px/1.7 "IBM Plex Mono", monospace;
+  border-radius: 8px;
+  color: #a9b7cc;
+  background: rgba(10, 13, 19, 0.92);
+  font: 400 11px/1.7 "IBM Plex Mono", monospace;
   white-space: pre-wrap;
   word-break: break-word;
   max-height: 360px;
@@ -517,7 +819,7 @@
 }
 
 .bp-node-raw--error {
-  color: #ff9bac;
+  color: #f0879c;
   border-color: rgba(255, 100, 120, 0.25);
   background: rgba(40, 10, 14, 0.9);
   max-height: 100px;
@@ -531,21 +833,34 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 14px;
+  gap: 10px;
   pointer-events: none;
 }
 
 .bp-state-overlay p {
   margin: 0;
-  color: rgba(200, 212, 232, 0.4);
-  font: 500 13px/1.5 "Plus Jakarta Sans", sans-serif;
+  color: rgba(201, 212, 227, 0.45);
+  font: 400 13px/1.6 "Segoe UI", sans-serif;
   text-align: center;
-  max-width: 300px;
+  max-width: 340px;
+}
+
+.bp-state-title {
+  color: rgba(232, 238, 248, 0.85) !important;
+  font-weight: 600 !important;
+  font-size: 14px !important;
+}
+
+.bp-state-glyph {
+  width: 44px;
+  height: 44px;
+  color: rgba(77, 157, 224, 0.4);
+  margin-bottom: 6px;
 }
 
 .bp-state-icon {
   font-size: 28px;
-  color: rgba(77, 157, 224, 0.3);
+  color: rgba(240, 135, 156, 0.6);
   line-height: 1;
 }
 
@@ -555,7 +870,7 @@
 }
 
 .bp-state-overlay--error p {
-  color: rgba(255, 154, 172, 0.7);
+  color: rgba(240, 135, 156, 0.85);
 }
 
 .bp-ellipsis::after {
@@ -572,52 +887,50 @@
   z-index: 10;
   max-width: 320px;
   padding: 12px 14px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 14px;
-  background: rgba(8, 10, 16, 0.82);
+  border: 1px solid #232a36;
+  border-radius: 10px;
+  background: rgba(16, 21, 29, 0.88);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
   pointer-events: none;
 }
 
 .bp-hud--tl {
-  top: 14px;
-  left: 14px;
+  top: 12px;
+  left: 12px;
 }
 
 .bp-hud--bl {
-  bottom: 72px;
-  left: 14px;
+  bottom: 14px;
+  left: 12px;
 }
 
 .bp-hud-name {
   display: block;
-  color: #dce5f4;
-  font-size: 14px;
-  font-weight: 700;
-  line-height: 1.3;
+  color: #e8eef8;
+  font: 600 13.5px/1.3 "Segoe UI", sans-serif;
 }
 
 .bp-hud-summary {
   margin: 6px 0 0;
-  color: #8a9bb5;
-  font: 500 11px/1.5 "Plus Jakarta Sans", sans-serif;
+  color: #8b99af;
+  font: 400 12px/1.55 "Segoe UI", sans-serif;
 }
 
 .bp-hud-badges {
   display: flex;
   flex-wrap: wrap;
   gap: 5px;
-  margin-top: 8px;
+  margin-top: 9px;
 }
 
 .bp-badge {
   display: inline-block;
   padding: 2px 8px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 6px;
-  color: #8a9bb5;
-  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid #2a3342;
+  border-radius: 5px;
+  color: #8b99af;
+  background: rgba(255, 255, 255, 0.04);
   font: 600 10px/1.6 "IBM Plex Mono", monospace;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -630,10 +943,10 @@
 }
 
 .bp-concepts-label {
-  color: rgba(138, 155, 181, 0.7);
-  font: 700 9px/1.4 "IBM Plex Mono", monospace;
+  color: rgba(125, 138, 160, 0.8);
+  font: 600 9.5px/1.4 "Segoe UI", sans-serif;
   text-transform: uppercase;
-  letter-spacing: 0.07em;
+  letter-spacing: 0.09em;
   margin-bottom: 7px;
 }
 
@@ -645,62 +958,61 @@
 
 .bp-concept {
   display: inline-block;
-  padding: 4px 9px;
-  border: 1px solid rgba(77, 157, 224, 0.2);
-  border-radius: 8px;
-  color: #a8bcd4;
-  background: rgba(77, 157, 224, 0.06);
-  font: 500 11px/1.4 "Plus Jakarta Sans", sans-serif;
+  padding: 3px 9px;
+  border: 1px solid rgba(77, 157, 224, 0.22);
+  border-radius: 6px;
+  color: #a5bad4;
+  background: rgba(77, 157, 224, 0.07);
+  font: 400 11.5px/1.4 "Segoe UI", sans-serif;
 }
 
 /* ── Zoom controls (bottom-right) ── */
 .bp-controls {
   position: absolute;
-  bottom: 18px;
-  right: 18px;
+  bottom: 12px;
+  right: 12px;
   z-index: 10;
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 5px 8px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
-  background: rgba(8, 10, 16, 0.85);
+  padding: 4px 6px;
+  border: 1px solid #232a36;
+  border-radius: 8px;
+  background: rgba(16, 21, 29, 0.92);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
 }
 
 .bp-ctrl-btn {
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 26px;
   display: grid;
   place-items: center;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  color: #c8d4e8;
-  background: rgba(255, 255, 255, 0.06);
-  font: 700 14px/1 "IBM Plex Mono", monospace;
+  border: 0;
+  border-radius: 5px;
+  color: #aab7cb;
+  background: transparent;
+  font: 600 14px/1 "IBM Plex Mono", monospace;
   cursor: pointer;
-  transition: background 120ms ease, border-color 120ms ease;
+  transition: background 120ms ease, color 120ms ease;
 }
 
 .bp-ctrl-btn:hover {
-  background: rgba(77, 157, 224, 0.15);
-  border-color: rgba(77, 157, 224, 0.35);
+  background: rgba(77, 157, 224, 0.16);
   color: #4d9de0;
 }
 
 .bp-ctrl-pct {
-  min-width: 38px;
+  min-width: 40px;
   text-align: center;
-  color: #7f8da3;
-  font: 600 10px/1 "IBM Plex Mono", monospace;
+  color: #7d8aa0;
+  font: 600 10.5px/1 "IBM Plex Mono", monospace;
 }
 
 .bp-ctrl-sep {
   width: 1px;
-  height: 18px;
-  background: rgba(255, 255, 255, 0.1);
+  height: 16px;
+  background: #232a36;
   margin: 0 2px;
 }
 
@@ -716,75 +1028,114 @@
   75% { content: "..."; }
 }
 
-/* ── Provider toggle (header pill) ── */
+/* ── Provider toggle (tab bar, segmented) ── */
 .bp-provider-toggle {
   display: flex;
-  gap: 4px;
-  padding: 3px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.04);
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid #232a36;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.03);
 }
 
 .bp-provider-btn {
-  height: 26px;
-  padding: 0 10px;
-  border: 1px solid transparent;
-  border-radius: 7px;
-  color: #7f8da3;
+  height: 24px;
+  padding: 0 11px;
+  border: 0;
+  border-radius: 5px;
+  color: #7d8aa0;
   background: transparent;
-  font: 700 10px/1 "IBM Plex Mono", monospace;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  font: 600 11px/1 "Segoe UI", sans-serif;
   cursor: pointer;
   transition: all 120ms ease;
 }
 
 .bp-provider-btn:hover {
-  color: #c8d4e8;
-  background: rgba(255, 255, 255, 0.07);
+  color: #c9d4e3;
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .bp-provider-btn.is-active {
-  color: #4d9de0;
-  background: rgba(77, 157, 224, 0.12);
-  border-color: rgba(77, 157, 224, 0.3);
+  color: #ffffff;
+  background: rgba(77, 157, 224, 0.28);
 }
 
-@media (max-width: 860px) {
-  .workspace-shell {
-    grid-template-columns: 1fr;
-    grid-template-rows: minmax(220px, 42%) minmax(0, 1fr);
+/* ── Retry button (shared by error overlays) ── */
+.bp-retry-btn {
+  pointer-events: auto;
+  margin: 4px 0 10px;
+  padding: 8px 18px;
+  border: 1px solid rgba(77, 157, 224, 0.45);
+  border-radius: 6px;
+  color: #e8eef8;
+  background: rgba(77, 157, 224, 0.14);
+  font: 600 12px/1 "Segoe UI", sans-serif;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.bp-retry-btn:hover {
+  background: rgba(77, 157, 224, 0.26);
+  border-color: rgba(77, 157, 224, 0.7);
+}
+
+/* ── Responsive ─────────────────────────────────────────────────────────────── */
+
+@media (max-width: 900px) {
+  .ide-explorer {
+    width: 224px;
+    min-width: 224px;
   }
 
-  .workspace-file-panel {
-    border-right: 0;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  }
-
-  .workspace-tree-row {
-    grid-template-columns: 18px minmax(150px, 1fr);
-    padding-left: calc(8px + (var(--tree-depth) * 12px));
-  }
-
-  .workspace-tree-size {
+  .ide-tabbar-label {
     display: none;
   }
 
-  .workspace-dock {
-    max-width: calc(100% - 20px);
-    gap: 8px;
+  .ide-status-item {
+    padding: 0 6px;
+  }
+}
+
+@media (max-width: 640px) {
+  .ide-frame {
+    flex-direction: column;
   }
 
-  .workspace-dock-item {
-    width: 46px;
-    height: 46px;
+  .ide-activitybar {
+    flex-direction: row;
+    width: 100%;
+    height: 44px;
+    padding: 0 6px;
+    border-right: 0;
+    border-bottom: 1px solid var(--ide-border);
   }
 
-  .workspace-test-grid {
-    grid-template-columns: 1fr;
+  .ide-activity-btn.is-active::before {
+    left: 8px;
+    right: 8px;
+    top: auto;
+    bottom: 0;
+    width: auto;
+    height: 2px;
   }
 
+  .ide-activity-spacer {
+    display: none;
+  }
+
+  .ide-explorer {
+    width: 100%;
+    min-width: 0;
+    max-height: 38vh;
+    border-right: 0;
+    border-bottom: 1px solid var(--ide-border);
+  }
+
+  .ide-tree-size {
+    display: none;
+  }
+
+  .workspace-test-grid,
   .workspace-test-results {
     grid-template-columns: 1fr;
   }

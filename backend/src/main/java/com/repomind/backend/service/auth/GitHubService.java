@@ -11,19 +11,16 @@ public class GitHubService {
 
     private final WebClient webClient;
 
-    @Value("${GITHUB_CLIENT_ID}")
+    @Value("${spring.security.oauth2.client.registration.github.client-id:}")
     private String clientId;
 
-    @Value("${GITHUB_CLIENT_SECRET}")
+    @Value("${spring.security.oauth2.client.registration.github.client-secret:}")
     private String clientSecret;
 
     public GitHubService(WebClient webClient) {
         this.webClient = webClient;
     }
 
-    /**
-     * Swaps the OAuth2 'code' for a GitHub Access Token.
-     */
     public Mono<String> getAccessToken(String code) {
         return webClient.post()
                 .uri("https://github.com/login/oauth/access_token")
@@ -35,12 +32,19 @@ public class GitHubService {
                 ))
                 .retrieve()
                 .bodyToMono(Map.class)
-                .map(response -> (String) response.get("access_token"));
+                .map(response -> {
+                    if (response.containsKey("error")) {
+                        throw new RuntimeException(
+                            "GitHub token exchange failed: " + response.get("error_description"));
+                    }
+                    String token = (String) response.get("access_token");
+                    if (token == null) {
+                        throw new RuntimeException("GitHub returned no access_token");
+                    }
+                    return token;
+                });
     }
 
-    /**
-     * Uses the Access Token to fetch the user's GitHub profile data.
-     */
     public Mono<Map<String, Object>> getGitHubProfile(String accessToken) {
         return webClient.get()
                 .uri("https://api.github.com/user")

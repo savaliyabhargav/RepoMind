@@ -1,0 +1,11 @@
+# Build output
+backend/target/
+frontend/dist/
+frontend/node_modules/
+
+# OS / IDE noise
+.DS_Store
+Thumbs.db
+.idea/
+*.iml
+.vscode/
