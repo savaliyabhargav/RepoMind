@@ -1,0 +1,25 @@
+server:
+  port: 8085
+
+spring:
+  application:
+    name: ai-provider-service
+
+management:
+  endpoints:
+    web:
+      base-path: /actuator
+      exposure:
+        include: health,info
+
+app:
+  ai:
+    provider: ${AI_PROVIDER:NVIDIA_DEV}
+    nvidia:
+      base-url: ${NVIDIA_BASE_URL:https://integrate.api.nvidia.com/v1}
+      api-key: ${NVIDIA_API_KEY:}
+    gemini:
+      api-key: ${GEMINI_API_KEY:}
+    groq:
+      # Comma-separated list for key rotation; falls back to the single-key var.
+      api-keys: ${GROQ_API_KEYS:${GROQ_API_KEY:}}

@@ -1,0 +1,39 @@
+server:
+  port: 8083
+
+spring:
+  application:
+    name: explain-diagram-service
+
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${EXPLAIN_DB_NAME:explain_db}
+    username: ${DB_USERNAME:repomind}
+    password: ${DB_PASSWORD:repomind123}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+management:
+  endpoints:
+    web:
+      base-path: /actuator
+      exposure:
+        include: health,info
+
+app:
+  ingestion-service:
+    base-url: ${INGESTION_SERVICE_URL:http://localhost:8082}
+  auth-service:
+    base-url: ${AUTH_SERVICE_URL:http://localhost:8081}
+  ai-provider-service:
+    base-url: ${AI_PROVIDER_SERVICE_URL:http://localhost:8085}

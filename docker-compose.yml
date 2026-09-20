@@ -14,6 +14,7 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./postgres-init:/docker-entrypoint-initdb.d
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME} -d ${DB_NAME}"]
       interval: 10s
@@ -122,22 +123,108 @@ services:
     networks:
       - repomind-network
 
-  # ── Backend ──────────────────────────────────────────────────────────────────
-  backend:
+  # ── Auth service ────────────────────────────────────────────────────────────
+  auth-service:
     build:
       context: ./backend
-      dockerfile: Dockerfile
-    container_name: repomind-backend
+      dockerfile: auth-service/Dockerfile
+    container_name: repomind-auth-service
     env_file:
       - .env
     ports:
-      - "8080:8080"
-      - "5005:5005"
+      - "8081:8081"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - repomind-network
+
+  # ── Repo ingestion service ──────────────────────────────────────────────────
+  repo-ingestion-service:
+    build:
+      context: ./backend
+      dockerfile: repo-ingestion-service/Dockerfile
+    container_name: repomind-repo-ingestion-service
+    env_file:
+      - .env
+    environment:
+      AUTH_SERVICE_URL: http://auth-service:8081
+    ports:
+      - "8082:8082"
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+      kafka:
+        condition: service_started
+      auth-service:
+        condition: service_started
+    networks:
+      - repomind-network
+
+  # ── Explain/diagram service ─────────────────────────────────────────────────
+  explain-diagram-service:
+    build:
+      context: ./backend
+      dockerfile: explain-diagram-service/Dockerfile
+    container_name: repomind-explain-diagram-service
+    env_file:
+      - .env
+    environment:
+      INGESTION_SERVICE_URL: http://repo-ingestion-service:8082
+      AUTH_SERVICE_URL: http://auth-service:8081
+      AI_PROVIDER_SERVICE_URL: http://ai-provider-service:8085
+    ports:
+      - "8083:8083"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      repo-ingestion-service:
+        condition: service_started
+      auth-service:
+        condition: service_started
+      ai-provider-service:
+        condition: service_started
+    networks:
+      - repomind-network
+
+  # ── Analysis service ─────────────────────────────────────────────────────────
+  analysis-service:
+    build:
+      context: ./backend
+      dockerfile: analysis-service/Dockerfile
+    container_name: repomind-analysis-service
+    env_file:
+      - .env
+    environment:
+      INGESTION_SERVICE_URL: http://repo-ingestion-service:8082
+      AUTH_SERVICE_URL: http://auth-service:8081
+      AI_PROVIDER_SERVICE_URL: http://ai-provider-service:8085
+    ports:
+      - "8084:8084"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      repo-ingestion-service:
+        condition: service_started
+      auth-service:
+        condition: service_started
+      ai-provider-service:
+        condition: service_started
+    networks:
+      - repomind-network
+
+  # ── AI provider service ─────────────────────────────────────────────────────
+  ai-provider-service:
+    build:
+      context: ./backend
+      dockerfile: ai-provider-service/Dockerfile
+    container_name: repomind-ai-provider-service
+    env_file:
+      - .env
+    ports:
+      - "8085:8085"
     networks:
       - repomind-network
 
@@ -148,12 +235,18 @@ services:
       dockerfile: Dockerfile
     container_name: repomind-frontend
     environment:
-      # Inside the compose network the backend resolves by service name
-      VITE_PROXY_TARGET: http://backend:8080
+      # Inside the compose network each backend service resolves by its own name
+      VITE_AUTH_SERVICE_TARGET: http://auth-service:8081
+      VITE_INGESTION_SERVICE_TARGET: http://repo-ingestion-service:8082
+      VITE_EXPLAIN_SERVICE_TARGET: http://explain-diagram-service:8083
+      VITE_ANALYSIS_SERVICE_TARGET: http://analysis-service:8084
     ports:
       - "5173:5173"
     depends_on:
-      - backend
+      - auth-service
+      - repo-ingestion-service
+      - explain-diagram-service
+      - analysis-service
     networks:
       - repomind-network
 

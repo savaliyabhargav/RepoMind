@@ -1,0 +1,49 @@
+server:
+  port: 8084
+
+spring:
+  application:
+    name: analysis-service
+
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${ANALYSIS_DB_NAME:analysis_db}
+    username: ${DB_USERNAME:repomind}
+    password: ${DB_PASSWORD:repomind123}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+management:
+  endpoints:
+    web:
+      base-path: /actuator
+      exposure:
+        include: health,info
+
+app:
+  ingestion-service:
+    base-url: ${INGESTION_SERVICE_URL:http://localhost:8082}
+  auth-service:
+    base-url: ${AUTH_SERVICE_URL:http://localhost:8081}
+  ai-provider-service:
+    base-url: ${AI_PROVIDER_SERVICE_URL:http://localhost:8085}
+  analysis:
+    max-duration-ms: ${ANALYSIS_MAX_DURATION_MS:120000}
+    quality-profile: ${ANALYSIS_QUALITY_PROFILE:BALANCED}
+    stage-ai-summary-enabled: ${ANALYSIS_STAGE_AI_SUMMARY_ENABLED:false}
+    deep-pass:
+      enabled: ${ANALYSIS_DEEP_PASS_ENABLED:true}
+    annotation:
+      ai-enrichment: ${ANNOTATION_AI_ENRICHMENT:false}
+      ai-max-files: ${ANNOTATION_AI_MAX_FILES:40}
+      ai-max-batches: ${ANNOTATION_AI_MAX_BATCHES:1}
