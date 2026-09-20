@@ -107,8 +107,21 @@ describe('repoService.explainFile', () => {
     const result = await repoService.explainFile('r1', 'f1');
 
     expect(api.get).toHaveBeenCalledWith('/repo/r1/files/f1/explain', {
-      params: { aiProvider: 'NVIDIA_DEV' },
+      params: { aiProvider: 'NVIDIA_DEV', refresh: false },
     });
     expect(result.explanation).toBeTruthy();
+  });
+});
+
+describe('repoService.getRepoOverview', () => {
+  it('GETs /repo/:repoId/overview with aiProvider and refresh params', async () => {
+    api.get.mockResolvedValue({ data: { diagramType: 'flowchart' } });
+
+    const result = await repoService.getRepoOverview('r1');
+
+    expect(api.get).toHaveBeenCalledWith('/repo/r1/overview', {
+      params: { aiProvider: 'GROQ', refresh: false },
+    });
+    expect(result.diagramType).toBe('flowchart');
   });
 });

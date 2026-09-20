@@ -23,6 +23,7 @@ vi.mock('../services/repoService', () => ({
     startAnalysis: vi.fn(),
     getAnalysisStages: vi.fn(),
     explainFile: vi.fn(),
+    getRepoOverview: vi.fn(),
   },
 }));
 
@@ -66,6 +67,16 @@ function renderWithRouter(repoId = REPO_ID) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // The workspace auto-loads the repo overview diagram when no file is open
+  repoService.getRepoOverview.mockResolvedValue({
+    fileId: `overview:${REPO_ID}`,
+    path: 'myowner/myrepo',
+    name: 'myrepo — system overview',
+    diagramType: 'flowchart',
+    mermaidCode: 'flowchart TD\n    A[Frontend] --> B[Backend]',
+    summary: 'Two-tier app.',
+    concepts: [],
+  });
   act(() =>
     useAuthStore.setState({
       accessToken: 'tok',

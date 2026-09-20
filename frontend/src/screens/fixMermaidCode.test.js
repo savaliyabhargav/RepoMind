@@ -57,6 +57,30 @@ aiProvider default NVIDIA_DEV
     expect(fixed).not.toContain('```');
   });
 
+  it('appends classDef palette when flowchart uses ::: style tags', () => {
+    const tagged = `flowchart TD
+    A[Controller]:::entry --> B[(Postgres)]:::db
+    B --> C[Groq API]:::external`;
+    const fixed = fixMermaidCode(tagged);
+    expect(fixed).toContain('classDef entry');
+    expect(fixed).toContain('classDef db');
+    expect(fixed).toContain('classDef external');
+    expect(fixed).toContain('classDef errorpath');
+    expect(fixed).toContain('classDef helper');
+  });
+
+  it('does not append classDef when no ::: tags are used or already defined', () => {
+    const plain = `flowchart TD
+    A[Start] --> B[End]`;
+    expect(fixMermaidCode(plain)).not.toContain('classDef');
+
+    const alreadyDefined = `flowchart TD
+    A[Start]:::entry --> B[End]
+    classDef entry fill:#000`;
+    const fixed = fixMermaidCode(alreadyDefined);
+    expect(fixed.match(/classDef entry/g)).toHaveLength(1);
+  });
+
   it('fixes classDiagram colon syntax', () => {
     const broken = `classDiagram
     class User {

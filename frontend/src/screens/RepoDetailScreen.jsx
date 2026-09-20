@@ -235,7 +235,7 @@ function collectFolderPaths(items, paths = []) {
 
 // ─── Blueprint Infinite Canvas ────────────────────────────────────────────────
 
-function BlueprintCanvas({ explain, loading, error, onRegenerate }) {
+function BlueprintCanvas({ explain, loading, error, onRegenerate, overviewMode = false }) {
   const viewportRef = useRef(null);
   const [transform, setTransform] = useState({ x: 0, y: 0, scale: 1 });
   const isDragging = useRef(false);
@@ -412,8 +412,10 @@ function BlueprintCanvas({ explain, loading, error, onRegenerate }) {
       {loading && (
         <div className="bp-state-overlay">
           <span className="workspace-loader" />
-          <p className="bp-state-title">Analyzing source<span className="bp-ellipsis" /></p>
-          <p>Reading the file and generating a diagram with AI — usually a few seconds.</p>
+          <p className="bp-state-title">{overviewMode ? "Mapping the system" : "Analyzing source"}<span className="bp-ellipsis" /></p>
+          <p>{overviewMode
+            ? "Drawing the whole-repository architecture — generated once, then cached."
+            : "Reading the file and generating a diagram with AI — usually a few seconds."}</p>
         </div>
       )}
 
@@ -518,19 +520,27 @@ function ExplainPane({ repoId, file, cacheRef }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [nonce, setNonce] = useState(0); // bumped by regenerate → bypasses cache
+  // Regenerate must bypass the server-side diagram cache exactly once —
+  // a plain state flag would leak refresh=true into later file switches.
+  const forceRefresh = useRef(false);
 
   const fileId = file?.id;
+  // No file selected → show the whole-repo system-design overview instead.
+  const cacheKey = fileId ? `${AI_PROVIDER}:${fileId}` : `${AI_PROVIDER}:overview:${repoId}`;
 
   useEffect(() => {
-    if (!fileId) { setData(null); setLoading(false); setError(""); return; }
-    const cacheKey = `${AI_PROVIDER}:${fileId}`;
-    if (cacheRef.current.has(cacheKey)) {
+    if (cacheRef.current.has(cacheKey) && !forceRefresh.current) {
       setData(cacheRef.current.get(cacheKey));
       setLoading(false); setError(""); return;
     }
+    const refresh = forceRefresh.current;
+    forceRefresh.current = false;
     let cancelled = false;
     setLoading(true); setData(null); setError("");
-    repoService.explainFile(repoId, fileId, AI_PROVIDER)
+    const request = fileId
+      ? repoService.explainFile(repoId, fileId, AI_PROVIDER, refresh)
+      : repoService.getRepoOverview(repoId, AI_PROVIDER, refresh);
+    request
       .then((d) => { if (!cancelled) { cacheRef.current.set(cacheKey, d); setData(d); setLoading(false); } })
       .catch((err) => {
         if (!cancelled) {
@@ -539,15 +549,15 @@ function ExplainPane({ repoId, file, cacheRef }) {
         }
       });
     return () => { cancelled = true; };
-  }, [repoId, fileId, nonce, cacheRef]);
+  }, [repoId, fileId, cacheKey, nonce, cacheRef]);
 
   const regenerate = useCallback(() => {
-    if (!fileId) return;
-    cacheRef.current.delete(`${AI_PROVIDER}:${fileId}`);
+    cacheRef.current.delete(cacheKey);
+    forceRefresh.current = true;
     setNonce((n) => n + 1);
-  }, [fileId, cacheRef]);
+  }, [cacheKey, cacheRef]);
 
-  return <BlueprintCanvas explain={data} loading={loading} error={error} onRegenerate={regenerate} />;
+  return <BlueprintCanvas explain={data} loading={loading} error={error} onRegenerate={regenerate} overviewMode={!fileId} />;
 }
 
 // ─── Main screen ──────────────────────────────────────────────────────────────
@@ -850,7 +860,7 @@ export default function RepoDetailScreen() {
                           </div>
                         ))
                       ) : (
-                        <div className="ide-tab-hint">Select a file to visualize its architecture</div>
+                        <div className="ide-tab-hint">System overview — open files from the Explorer for per-file diagrams</div>
                       )}
                     </div>
                     <div className="ide-tabbar-actions">

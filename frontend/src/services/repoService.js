@@ -31,9 +31,16 @@ const repoService = {
     return response.data;
   },
 
-  explainFile: async (repoId, fileId, aiProvider = "NVIDIA_DEV") => {
+  explainFile: async (repoId, fileId, aiProvider = "NVIDIA_DEV", refresh = false) => {
     const response = await api.get(`/repo/${repoId}/files/${fileId}/explain`, {
-      params: { aiProvider },
+      params: { aiProvider, refresh },
+    });
+    return response.data;
+  },
+
+  getRepoOverview: async (repoId, aiProvider = "GROQ", refresh = false) => {
+    const response = await api.get(`/repo/${repoId}/overview`, {
+      params: { aiProvider, refresh },
     });
     return response.data;
   },
