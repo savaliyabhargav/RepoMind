@@ -44,6 +44,7 @@ services:
   qdrant:
     image: qdrant/qdrant:v1.11.0
     container_name: repomind-qdrant
+    profiles: ["full"]   # opt-in: docker compose --profile full up
     ports:
       - "6333:6333"
     volumes:
@@ -83,6 +84,7 @@ services:
   minio:
     image: minio/minio:latest
     container_name: repomind-minio
+    profiles: ["full"]   # opt-in: docker compose --profile full up
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: ${MINIO_ACCESS_KEY}
@@ -99,6 +101,7 @@ services:
   pgadmin:
     image: dpage/pgadmin4:latest
     container_name: repomind-pgadmin
+    profiles: ["full"]   # opt-in: docker compose --profile full up
     environment:
       PGADMIN_DEFAULT_EMAIL: admin@repomind.com
       PGADMIN_DEFAULT_PASSWORD: admin123
@@ -113,6 +116,7 @@ services:
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
     container_name: repomind-kafka-ui
+    profiles: ["full"]   # opt-in: docker compose --profile full up
     environment:
       KAFKA_CLUSTERS_0_NAME: repomind
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
@@ -136,6 +140,9 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    volumes:
+      # shared Maven cache: avoids re-downloading every dependency on each rebuild
+      - ${HOME}/.m2:/root/.m2
     networks:
       - repomind-network
 
@@ -160,6 +167,9 @@ services:
         condition: service_started
       auth-service:
         condition: service_started
+    volumes:
+      # shared Maven cache: avoids re-downloading every dependency on each rebuild
+      - ${HOME}/.m2:/root/.m2
     networks:
       - repomind-network
 
@@ -186,6 +196,9 @@ services:
         condition: service_started
       ai-provider-service:
         condition: service_started
+    volumes:
+      # shared Maven cache: avoids re-downloading every dependency on each rebuild
+      - ${HOME}/.m2:/root/.m2
     networks:
       - repomind-network
 
@@ -212,6 +225,9 @@ services:
         condition: service_started
       ai-provider-service:
         condition: service_started
+    volumes:
+      # shared Maven cache: avoids re-downloading every dependency on each rebuild
+      - ${HOME}/.m2:/root/.m2
     networks:
       - repomind-network
 
@@ -223,8 +239,17 @@ services:
     container_name: repomind-ai-provider-service
     env_file:
       - .env
+      # git-ignored overrides (Kaggle tunnel URL + key); optional, wins over .env
+      - path: .env.local
+        required: false
+    extra_hosts:
+      # lets the container reach Ollama running on the host (http://host.docker.internal:11434/v1)
+      - "host.docker.internal:host-gateway"
     ports:
       - "8085:8085"
+    volumes:
+      # shared Maven cache: avoids re-downloading every dependency on each rebuild
+      - ${HOME}/.m2:/root/.m2
     networks:
       - repomind-network
 

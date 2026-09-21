@@ -37,3 +37,4 @@ app:
     base-url: ${AUTH_SERVICE_URL:http://localhost:8081}
   ai-provider-service:
     base-url: ${AI_PROVIDER_SERVICE_URL:http://localhost:8085}
+    timeout-seconds: ${AI_PROVIDER_TIMEOUT_SECONDS:600}

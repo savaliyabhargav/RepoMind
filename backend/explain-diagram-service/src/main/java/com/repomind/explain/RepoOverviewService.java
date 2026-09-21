@@ -92,7 +92,7 @@ public class RepoOverviewService {
         }
 
         String provider = (providerInput == null || providerInput.isBlank())
-                ? "GROQ" : providerInput.trim().toUpperCase();
+                ? "LOCAL" : providerInput.trim().toUpperCase();
         String userPrompt = buildUserPrompt(repo, files);
         DiagramPayload payload = diagramGenerationService.generate(
                 provider, SYSTEM_PROMPT, userPrompt, true, "overview:" + repo.name());

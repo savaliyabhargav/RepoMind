@@ -37,8 +37,9 @@ app:
     base-url: ${AUTH_SERVICE_URL:http://localhost:8081}
   ai-provider-service:
     base-url: ${AI_PROVIDER_SERVICE_URL:http://localhost:8085}
+    timeout-seconds: ${AI_PROVIDER_TIMEOUT_SECONDS:600}
   analysis:
-    max-duration-ms: ${ANALYSIS_MAX_DURATION_MS:120000}
+    max-duration-ms: ${ANALYSIS_MAX_DURATION_MS:600000}
     quality-profile: ${ANALYSIS_QUALITY_PROFILE:BALANCED}
     stage-ai-summary-enabled: ${ANALYSIS_STAGE_AI_SUMMARY_ENABLED:false}
     deep-pass:

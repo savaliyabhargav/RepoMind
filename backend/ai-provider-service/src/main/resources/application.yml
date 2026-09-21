@@ -14,7 +14,19 @@ management:
 
 app:
   ai:
-    provider: ${AI_PROVIDER:NVIDIA_DEV}
+    provider: ${AI_PROVIDER:LOCAL}
+    local:
+      # Any OpenAI-compatible server (Ollama, llama.cpp, vLLM, Kaggle/Colab behind a tunnel, ...).
+      # Comma-separated, in priority order; the next one is tried when one fails.
+      endpoints: ${LOCAL_LLM_ENDPOINTS:http://localhost:11434/v1}
+      api-key: ${LOCAL_LLM_API_KEY:}
+      model: ${LOCAL_LLM_MODEL:gemma4:e4b-it-qat}
+      embedding-model: ${LOCAL_LLM_EMBEDDING_MODEL:nomic-embed-text}
+      timeout-seconds: ${LOCAL_LLM_TIMEOUT_SECONDS:300}
+      cooldown-seconds: ${LOCAL_LLM_COOLDOWN_SECONDS:30}
+      # 'none' switches off hidden "thinking" (Gemma 4 etc.) so the token budget goes to the answer.
+      # Use low/medium/high to allow reasoning, or leave blank to not send the parameter.
+      reasoning-effort: ${LOCAL_LLM_REASONING_EFFORT:none}
     nvidia:
       base-url: ${NVIDIA_BASE_URL:https://integrate.api.nvidia.com/v1}
       api-key: ${NVIDIA_API_KEY:}

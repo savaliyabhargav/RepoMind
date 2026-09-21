@@ -73,7 +73,7 @@ describe('repoService.startAnalysis', () => {
     expect(api.post).toHaveBeenCalledWith('/analyses', {
       repoId: 'r1',
       userId: 'u1',
-      aiProvider: 'NVIDIA_DEV',
+      aiProvider: 'LOCAL',
     });
     expect(result.analysisId).toBe('a1');
   });
@@ -107,7 +107,7 @@ describe('repoService.explainFile', () => {
     const result = await repoService.explainFile('r1', 'f1');
 
     expect(api.get).toHaveBeenCalledWith('/repo/r1/files/f1/explain', {
-      params: { aiProvider: 'NVIDIA_DEV', refresh: false },
+      params: { aiProvider: 'LOCAL', refresh: false },
     });
     expect(result.explanation).toBeTruthy();
   });
@@ -120,7 +120,7 @@ describe('repoService.getRepoOverview', () => {
     const result = await repoService.getRepoOverview('r1');
 
     expect(api.get).toHaveBeenCalledWith('/repo/r1/overview', {
-      params: { aiProvider: 'GROQ', refresh: false },
+      params: { aiProvider: 'LOCAL', refresh: false },
     });
     expect(result.diagramType).toBe('flowchart');
   });

@@ -260,7 +260,7 @@ public class FileExplainService {
     }
 
     private String resolveProvider(String input) {
-        return (input == null || input.isBlank()) ? "NVIDIA_DEV" : input.trim().toUpperCase();
+        return (input == null || input.isBlank()) ? "LOCAL" : input.trim().toUpperCase();
     }
 
     private String inferLanguage(String path) {
