@@ -28,7 +28,7 @@ public class DiagramGenerationService {
     // Tried in order when the requested provider fails (rate limit, network, bad JSON).
     // Returning a real error beats a fake generic diagram: the frontend caches successful
     // responses per file, so a fake diagram would stick even after the provider recovers.
-    private static final List<String> PROVIDER_FAILOVER_ORDER = List.of("GROQ", "NVIDIA_DEV", "GEMINI");
+    private static final List<String> PROVIDER_FAILOVER_ORDER = List.of("LOCAL", "GROQ", "NVIDIA_DEV", "GEMINI");
 
     // 7000 leaves ~1000 tokens of headroom under the 8k output limit shared by
     // the free-tier providers. Raising the cap costs nothing when unused —

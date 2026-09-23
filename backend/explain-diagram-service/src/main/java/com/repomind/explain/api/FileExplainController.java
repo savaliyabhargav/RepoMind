@@ -25,7 +25,7 @@ public class FileExplainController {
     public ResponseEntity<FileExplainResponse> explain(
             @PathVariable UUID repoId,
             @PathVariable UUID fileId,
-            @RequestParam(required = false, defaultValue = "NVIDIA_DEV") String aiProvider,
+            @RequestParam(required = false, defaultValue = "LOCAL") String aiProvider,
             @RequestParam(required = false, defaultValue = "false") boolean refresh
     ) {
         return ResponseEntity.ok(fileExplainService.explain(repoId, fileId, aiProvider, refresh));
@@ -34,7 +34,7 @@ public class FileExplainController {
     @GetMapping("/{repoId}/overview")
     public ResponseEntity<FileExplainResponse> overview(
             @PathVariable UUID repoId,
-            @RequestParam(required = false, defaultValue = "GROQ") String aiProvider,
+            @RequestParam(required = false, defaultValue = "LOCAL") String aiProvider,
             @RequestParam(required = false, defaultValue = "false") boolean refresh
     ) {
         return ResponseEntity.ok(repoOverviewService.overview(repoId, aiProvider, refresh));

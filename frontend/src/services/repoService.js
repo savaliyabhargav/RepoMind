@@ -21,7 +21,7 @@ const repoService = {
     return response.data;
   },
 
-  startAnalysis: async ({ repoId, userId, aiProvider = "NVIDIA_DEV" }) => {
+  startAnalysis: async ({ repoId, userId, aiProvider = "LOCAL" }) => {
     const response = await api.post("/analyses", { repoId, userId, aiProvider });
     return response.data;
   },
@@ -31,14 +31,14 @@ const repoService = {
     return response.data;
   },
 
-  explainFile: async (repoId, fileId, aiProvider = "NVIDIA_DEV", refresh = false) => {
+  explainFile: async (repoId, fileId, aiProvider = "LOCAL", refresh = false) => {
     const response = await api.get(`/repo/${repoId}/files/${fileId}/explain`, {
       params: { aiProvider, refresh },
     });
     return response.data;
   },
 
-  getRepoOverview: async (repoId, aiProvider = "GROQ", refresh = false) => {
+  getRepoOverview: async (repoId, aiProvider = "LOCAL", refresh = false) => {
     const response = await api.get(`/repo/${repoId}/overview`, {
       params: { aiProvider, refresh },
     });

@@ -9,3 +9,7 @@ Thumbs.db
 .idea/
 *.iml
 .vscode/
+
+# local secrets/overrides
+.env.local
+kaggle/.venv/

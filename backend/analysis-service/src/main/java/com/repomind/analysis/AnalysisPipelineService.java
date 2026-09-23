@@ -98,7 +98,7 @@ public class AnalysisPipelineService {
             @Value("${app.analysis.annotation.ai-max-batches:2}") int annotationAiMaxBatches,
             @Value("${app.analysis.stage-ai-summary-enabled:false}") boolean stageAiSummaryEnabled,
             @Value("${app.analysis.deep-pass.enabled:true}") boolean deepPassEnabled,
-            @Value("${app.analysis.max-duration-ms:120000}") long maxDurationMs,
+            @Value("${app.analysis.max-duration-ms:600000}") long maxDurationMs,
             @Value("${app.analysis.quality-profile:BALANCED}") String defaultQualityProfile
     ) {
         this.analysisRepository = analysisRepository;
@@ -1653,7 +1653,7 @@ public class AnalysisPipelineService {
 
     private String normalizeProvider(String aiProviderInput) {
         if (aiProviderInput == null || aiProviderInput.isBlank()) {
-            return "NVIDIA_DEV";
+            return "LOCAL";
         }
         return aiProviderInput.trim().toUpperCase(Locale.ROOT);
     }
